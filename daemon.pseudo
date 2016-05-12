@@ -1,0 +1,12 @@
+listen
+for (;;) {
+    accept
+    recv
+    case first seven bytes
+        allkeys:
+            do that
+        other:
+            check next two bytes = length of remaining
+            recv until eof
+    do stuff
+}
