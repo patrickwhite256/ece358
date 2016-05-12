@@ -10,13 +10,14 @@
 const int INITIAL_BUFFER_LEN = 300;
 
 int pickServerIPAddr(in_addr *srv_ip);
+void addakey(unsigned char *msg);
 
 void handle_error() {
     std::cout << "errrrrrrrr" << std::endl;
 }
 
 void daemon_loop(int sockfd) {
-    char initial_buffer[INITIAL_BUFFER_LEN];
+    unsigned char initial_buffer[INITIAL_BUFFER_LEN];
     if(listen(sockfd, 0) < 0) {
         handle_error();
     }
@@ -29,7 +30,7 @@ void daemon_loop(int sockfd) {
             handle_error();
         }
         ssize_t recv_len = recv(connectedsock, initial_buffer,
-                                INITIAL_BUFFER_LEN - 1, 0);
+                                INITIAL_BUFFER_LEN, 0);
         if(recv_len < 0) {
             handle_error();
         }
@@ -45,15 +46,21 @@ void daemon_loop(int sockfd) {
             std::cout << "allkeys!" << std::endl;
         } else {
             int msg_size = (initial_buffer[7] << 8) + initial_buffer[8];
-            char *contents = new char[msg_size];
-            std::cout << "size: " << msg_size << std::endl;
-            int msg_remaining = msg_size - (recv_len - 9);
+            std::cout << (int) initial_buffer[7] << " " << (int) initial_buffer[8] << std::endl;
+            unsigned char *contents = new unsigned char[msg_size + 1];
+            int msg_remaining = msg_size;
             int amt_from_first_packet = std::min(msg_remaining, INITIAL_BUFFER_LEN - 9);
             memcpy(contents, &initial_buffer[9], amt_from_first_packet);
             msg_remaining -= amt_from_first_packet;
             while(msg_remaining) {
                 recv_len = recv(connectedsock, &contents[msg_size - msg_remaining],
                                 msg_remaining, 0);
+                msg_remaining -= recv_len;
+            }
+            contents[msg_size] = '\0';
+
+            if(strcmp(cmd, "addakey") == 0) {
+                addakey(contents);
             }
         }
     }
