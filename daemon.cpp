@@ -5,6 +5,7 @@
 #include <netinet/tcp.h>
 #include <sys/socket.h>
 #include <sys/types.h>
+#include <algorithm>
 
 const int INITIAL_BUFFER_LEN = 300;
 
@@ -47,7 +48,7 @@ void daemon_loop(int sockfd) {
             char *contents = new char[msg_size];
             std::cout << "size: " << msg_size << std::endl;
             int msg_remaining = msg_size - (recv_len - 9);
-            int amt_from_first_packet = min(msg_remaining, INITIAL_BUFFER_LEN - 9);
+            int amt_from_first_packet = std::min(msg_remaining, INITIAL_BUFFER_LEN - 9);
             memcpy(contents, &initial_buffer[9], amt_from_first_packet);
             msg_remaining -= amt_from_first_packet;
             while(msg_remaining) {
