@@ -1,8 +1,5 @@
 # Compiled Object files
-*.slo
-*.lo
-*.o
-*.obj
+build
 
 # Precompiled Headers
 *.gch
@@ -23,6 +20,4 @@
 *.lib
 
 # Executables
-*.exe
-*.out
-*.app
+bin
