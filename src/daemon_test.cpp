@@ -2,7 +2,7 @@
 #include <cstring>
 #include <arpa/inet.h>
 
-#include "peer.h"
+#include "daemon.h"
 
 int pickServerIPAddr(in_addr *srv_ip);
 
@@ -33,7 +33,7 @@ int main(int argc, char **argv) {
     std::cout << "server at" << inet_ntoa(server.sin_addr) << ":"
          << ntohs(server.sin_port) << std::endl;
 
-    PeerDaemon *peer = new PeerDaemon;
-    peer->loop(sockfd);
-    delete peer;
+    Daemon *daemon = new Daemon;
+    daemon->loop(sockfd);
+    delete daemon;
 }
