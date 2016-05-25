@@ -8,7 +8,7 @@
 #include <sys/socket.h>
 #include <sys/types.h>
 
-#include "peer.h"
+#include "daemon.h"
 
 const int INITIAL_BUFFER_LEN = 300;
 
@@ -17,7 +17,7 @@ void die_on_error() {
     exit(-1);
 }
 
-void PeerDaemon::loop(int sockfd) {
+void Daemon::loop(int sockfd) {
     unsigned char initial_buffer[INITIAL_BUFFER_LEN];
     if(listen(sockfd, 0) < 0) {
         die_on_error();

@@ -1,6 +1,6 @@
 CXX=g++
 CXXFLAGS= -g -Wall
-EXECS=peer-test
+EXECS=daemon-test
 _EXECS=$(patsubst %,bin/%, $(EXECS))
 _OBJECTS=$(patsubst src/%.cpp,build/%.o, $(wildcard src/*.cpp))
 
@@ -22,5 +22,5 @@ clean:
 
 ####################################################################
 
-bin/peer-test: build/peer.o build/peer_test.o build/pickip.o
+bin/daemon-test: build/daemon.o build/daemon_test.o build/pickip.o
 	$(CXX) $(CXXFLAGS) $^ -o $@
