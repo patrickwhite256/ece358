@@ -51,4 +51,18 @@ void PeerDaemon::send_command(char *cmd_id, char *cmd_body, int body_len, sockad
     }
 }
 
+void PeerDaemon::broadcast(char *cmd_id, char *cmd_body, int body_len, Peer *start) {
+    if (!start->me) {
+        send_command(cmd_id, cmd_body, body_len, start->addr);
+    }
+
+    Peer *next = start->left;
+
+    while(next != start) {
+        if (next->me) continue;
+
+        send_command(cmd_id, cmd_body, body_len, next->addr);
+        next = next->left;
+    }
+}
 

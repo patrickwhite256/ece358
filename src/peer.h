@@ -1,16 +1,8 @@
-#ifndef PEER_H
-#define PEER_H
-
-#include <netinet/in.h>
-
-struct Peer {
-    Peer *next;
-    Peer *previous;
-    int key_count;
-    int id;
-    sockaddr_in address;
-
-    Peer(sockaddr_in address, int key_count, int id);
+class PeerDaemon {
+    void send_command(char *cmd_id, char *cmd_body, int body_len, sockaddr_in dest);
+    void broadcast(char *cmd_id, char *cmd_body, int body_len, Peer *start);
+  public:
+    void loop(int sockfd);
 };
 
-#endif
+void die_on_error();
