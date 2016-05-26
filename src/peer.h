@@ -3,13 +3,13 @@
 
 #include <netinet/in.h>
 
-class Peer {
+struct Peer {
     Peer *next;
     Peer *previous;
     int key_count;
     bool is_me;
     sockaddr_in address;
-  public:
+
     Peer(sockaddr_in addr, int count, bool me = false);
 };
 
