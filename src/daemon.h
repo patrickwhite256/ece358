@@ -1,10 +1,29 @@
 #include "peer.h"
 
-class Daemon {
-    int id;
+#include <netinet/in.h>
+#include "peer.h"
 
-    void send_command(char *cmd_id, char *cmd_body, int body_len, sockaddr_in *dest);
-    void broadcast(char *cmd_id, char *cmd_body, int body_len, Peer *start);
+class Daemon {
+    struct Message {
+        char *command;
+        int size;
+        char *body;
+        sockaddr_in client;
+        Message(char *command, int size, char *body, sockaddr_in client) :
+            command(command), size(size), body(body), client(client) {}
+        ~Message() {
+            delete command;
+            delete body;
+        }
+    };
+
+    int sockfd;
+    int peer_id;
+    Peer *peer_set;
+
+    void send_command(const char *cmd_id, char *cmd_body, int body_len, sockaddr_in *dest);
+    void broadcast(const char *cmd_id, char *cmd_body, int body_len);
+    Message *receive_message();
 
     // Methods that broadcast messages
     void broadcast_tick_fwd();
@@ -21,9 +40,14 @@ class Daemon {
     void process_add_peer(char *body);
     void process_remove_peer(char *body);
     void process_update_total(char *body);
+    void process_request_info(Message *message);
+    void process_new_peer(Message *message);
 
   public:
-    void loop(int id, int sockfd);
+    Daemon(int sockfd);
+    ~Daemon();
+    void connect(const char *remote_ip, int remote_port);
+    void loop();
 };
 
 void die_on_error();
