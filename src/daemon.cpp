@@ -64,7 +64,7 @@ void Daemon::loop(int sockfd) {
     }
 }
 
-void Daemon::send_command(char *cmd_id, char *cmd_body, int body_len, sockaddr_in dest) {
+void Daemon::send_command(char *cmd_id, char *cmd_body, int body_len, sockaddr_in *dest) {
     int sockfd = -1;
     if((sockfd = socket(AF_INET, SOCK_STREAM, 0)) < 0) {
         die_on_error();
@@ -84,7 +84,7 @@ void Daemon::send_command(char *cmd_id, char *cmd_body, int body_len, sockaddr_i
         die_on_error();
     }
 
-    if(connect(sockfd, (struct sockaddr *)&dest, sizeof(struct sockaddr_in)) < 0) {
+    if(connect(sockfd, (struct sockaddr *)dest, sizeof(struct sockaddr_in)) < 0) {
         die_on_error();
     }
 
