@@ -7,10 +7,10 @@ struct Peer {
     Peer *next;
     Peer *previous;
     int key_count;
-    bool is_me;
+    int id;
     sockaddr_in address;
 
-    Peer(sockaddr_in addr, int count, bool me = false);
+    Peer(sockaddr_in address, int key_count, int id);
 };
 
 #endif
