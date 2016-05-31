@@ -1,11 +1,11 @@
-#include <iostream>
+#include <arpa/inet.h>
 #include <cstring>
-#include <unistd.h>
-#include <arpa/inet.h>
-#include <netinet/in.h>
-#include <arpa/inet.h>
+#include <cstdlib>
 #include <ifaddrs.h>
+#include <iostream>
+#include <netinet/in.h>
 #include <net/if.h>
+#include <unistd.h>
 
 #include "daemon.h"
 
@@ -50,18 +50,19 @@ int main(int argc, char **argv) {
         die_on_error();
     }
 
+    if(daemon(0, 1) < 0) { // fork process
+        die_on_error();
+    }
+
+    Daemon dmon(sockfd);
+    if (argc > 1) { //connect to peer
+        dmon.connect(argv[1], atoi(argv[2]));
+    }
+
     std::cout << inet_ntoa(server.sin_addr)
               << " "
               << ntohs(server.sin_port)
               << std::endl;
 
-    if(daemon(0, 0) < 0) { // fork process
-        die_on_error();
-    }
-
-    if (argc == 1) { //first peer
-        Daemon dmon;
-        dmon.loop(sockfd);
-    } else { //connect to peer
-    }
+    dmon.loop();
 }
