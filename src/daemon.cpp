@@ -18,11 +18,13 @@ void die_on_error() {
     exit(-1);
 }
 
-void Daemon::loop(int sockfd) {
+void Daemon::loop(int id, int sockfd) {
     unsigned char initial_buffer[INITIAL_BUFFER_LEN];
     if(listen(sockfd, 0) < 0) {
         die_on_error();
     }
+
+    this->id = id;
 
     while(true) {
         sockaddr_in client;
@@ -110,16 +112,16 @@ void Daemon::send_command(char *cmd_id, char *cmd_body, int body_len, sockaddr_i
 }
 
 void Daemon::broadcast(char *cmd_id, char *cmd_body, int body_len, Peer *start) {
-    if (!start->is_me) {
-        send_command(cmd_id, cmd_body, body_len, start->address);
+    if (start->id != this->id) {
+        send_command(cmd_id, cmd_body, body_len, &start->address);
     }
 
     Peer *next = start->next;
 
     while(next != start) {
-        if (next->is_me) continue;
+        if (next->id == this->id) continue;
 
-        send_command(cmd_id, cmd_body, body_len, next->address);
+        send_command(cmd_id, cmd_body, body_len, &next->address);
         next = next->next;
     }
 }
