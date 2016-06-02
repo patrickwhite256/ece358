@@ -10,6 +10,7 @@
 
 #include "daemon.h"
 #include "peer.h"
+#include "basic_exception.h"
 
 const int INITIAL_BUFFER_LEN = 300;
 
@@ -87,7 +88,7 @@ void Daemon::send_command(char *cmd_id, char *cmd_body, int body_len, sockaddr_i
     }
 
     if(connect(sockfd, (struct sockaddr *)dest, sizeof(struct sockaddr_in)) < 0) {
-        die_on_error();
+        throw Exception(BAD_ADDRESS);
     }
 
     size_t msglen = body_len + 9;
