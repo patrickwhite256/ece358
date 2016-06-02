@@ -1,6 +1,6 @@
 CXX=g++
 CXXFLAGS= -g -Wall
-EXECS=daemon-test addpeer
+EXECS= addpeer
 BIN_DIR=bin
 _EXECS=$(patsubst %,$(BIN_DIR)/%, $(EXECS))
 _OBJECTS=$(patsubst src/%.cpp,build/%.o, $(wildcard src/*.cpp))
@@ -22,9 +22,6 @@ clean:
 	rm -rf *.d *.o $(BIN_DIR) build
 
 ####################################################################
-
-$(BIN_DIR)/daemon-test: build/daemon.o build/daemon_test.o build/pickip.o
-	$(CXX) $(CXXFLAGS) $^ -o $@
 
 $(BIN_DIR)/addpeer: build/daemon.o build/peer.o build/add_peer.o
 	$(CXX) $(CXXFLAGS) $^ -o $@
