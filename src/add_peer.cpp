@@ -8,6 +8,7 @@
 #include <unistd.h>
 
 #include "daemon.h"
+#include "basic_exception.h"
 
 int main(int argc, char **argv) {
     int sockfd = socket(AF_INET, SOCK_STREAM, 0);
@@ -56,7 +57,12 @@ int main(int argc, char **argv) {
 
     Daemon dmon(sockfd);
     if (argc > 1) { //connect to peer
-        dmon.connect(argv[1], atoi(argv[2]));
+        try {
+            dmon.connect(argv[1], atoi(argv[2]));
+        } catch (Exception ex) {
+            std::cerr << "Error: no such peer";
+            exit(-1);
+        }
     }
 
     std::cout << inet_ntoa(server.sin_addr)

@@ -23,8 +23,7 @@ void die_on_error() {
 
 Daemon::Daemon(int sockfd) {
     this->sockfd = sockfd;
-    // assume we are the first node until told otherwise
-    this->peer_id = 0;
+    this->peer_id = 0; // assume we are the first node until told otherwise
     sockaddr_in dummy;
     this->peer_set = new Peer(dummy, 0, 0);
 }
@@ -147,8 +146,7 @@ void Daemon::connect(const char *remote_ip, int remote_port) {
     remote.sin_family = AF_INET;
     remote.sin_addr = addr;
     remote.sin_port = remote_port;
-    send_command(REQUEST_INFO, (char *)"", 0, &remote);
-    // TODO: if unreachable: no such peer
+    send_command(REQUEST_INFO, (char *)"", 0, &remote); //can throw Exception
     Message *net_info = receive_message();
     // TODO: reconfigure peer set
     delete net_info;
