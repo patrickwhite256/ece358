@@ -92,8 +92,8 @@ Daemon::Message *Daemon::receive_message() {
 }
 
 void Daemon::send_command(const char *cmd_id, const char *cmd_body, int body_len, sockaddr_in *dest) {
-    int sockfd = -1;
-    if((sockfd = socket(AF_INET, SOCK_STREAM, 0)) < 0) {
+    int sock = -1;
+    if((sock = socket(AF_INET, SOCK_STREAM, 0)) < 0) {
         die_on_error();
     }
 
@@ -102,16 +102,16 @@ void Daemon::send_command(const char *cmd_id, const char *cmd_body, int body_len
     client.sin_family = AF_INET;
     client.sin_addr.s_addr = htonl(INADDR_ANY);
     client.sin_port = 0;
-    if(bind(sockfd, (struct sockaddr *)&client, sizeof(struct sockaddr_in)) < 0) {
+    if(bind(sock, (struct sockaddr *)&client, sizeof(struct sockaddr_in)) < 0) {
         die_on_error();
     }
 
     socklen_t alen = sizeof(struct sockaddr_in);
-    if(getsockname(sockfd, (struct sockaddr *)&client, &alen) < 0) {
+    if(getsockname(sock, (struct sockaddr *)&client, &alen) < 0) {
         die_on_error();
     }
 
-    if(::connect(sockfd, (struct sockaddr *)dest, sizeof(struct sockaddr_in)) < 0) {
+    if(::connect(sock, (struct sockaddr *)dest, sizeof(struct sockaddr_in)) < 0) {
         throw Exception(BAD_ADDRESS);
     }
 
@@ -127,11 +127,11 @@ void Daemon::send_command(const char *cmd_id, const char *cmd_body, int body_len
     }
 
     ssize_t sentlen;
-    if((sentlen = send(sockfd, msg, msglen, 0)) < 0 ) {
+    if((sentlen = send(sock, msg, msglen, 0)) < 0 ) {
         die_on_error();
     }
 
-    if(shutdown(sockfd, SHUT_RDWR) < 0) {
+    if(shutdown(sock, SHUT_RDWR) < 0) {
         die_on_error();
     }
 }
@@ -147,7 +147,7 @@ void Daemon::broadcast(const char *cmd_id, const char *cmd_body, int body_len) {
     } while (next != peer_set);
 }
 
-void Daemon::connect(const char *remote_ip, int remote_port) {
+void Daemon::connect(const char *remote_ip, unsigned short remote_port) {
     in_addr addr;
     sockaddr_in remote;
     inet_aton(remote_ip, &addr);

@@ -47,6 +47,6 @@ class Daemon {
   public:
     Daemon(int sockfd);
     ~Daemon();
-    void connect(const char *remote_ip, int remote_port);
+    void connect(const char *remote_ip, unsigned short remote_port);
     void loop();
 };
