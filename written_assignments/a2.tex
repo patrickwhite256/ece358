@@ -1,0 +1,37 @@
+\documentclass[10pt,a4paper]{article}
+\usepackage[utf8]{inputenc}
+\usepackage{amsmath}
+\usepackage{amsfonts}
+\usepackage[margin=1in]{geometry}
+\usepackage{amssymb}
+\author{Joel Mizzoni (jmizzoni), Patrick White (ps2white)}
+\begin{document}
+\title{ECE358 S'16 Assignment 2}
+\maketitle
+\section{}
+
+For any $m>1$, consider the Chord DHT with $n=3$, with peers at $0$, $1$, and $2^{m-1}$.
+The finger table at the last node will be $<0,0,...,0>$ (with $m$ entries) since for each entry $i$ the value is succ($2^{m-1}+2^{i-1}$), the maximum value of which is succ$(2^{m-1}+2^{m-1})=$ succ$(2^m)=0$.
+Consider lookup($1$) starting at the $q=2^{m-1}$ peer. The next peer is $p=0$, since all entries in the finger table are $0$. Then $q-p=0$ since there are no peers between $q$ and $p$.
+Since $(k-p)/2=(1-0)/2=1/2$, the statement that $q-p\geq (k-p)/2$ is false.
+\section{}
+Both of these answers make the assumption that ``updating" is a distinct operation from ``creating" a lookup table, so the new peer's table is not included.
+\subsection*{a}
+For any $m$, consider the DHT with the peers $0,1,...2^{m-1}-1$. This DHT has $2^{m-1}=m/2$ peers. For each peer $i$, the last entry in the finger table is succ($i+2^{m-1})$. For the first peer (0), this is succ($2^{m-1})=0$. For the last peer, this is succ($2^{m}-1)=0$. All of the entries in between also have the last entry equal to $0$, since the successor of all entries from $2^{m-1}$ to $2^m-1$ is 0. Adding a peer at $2^{m}-1$ causes each of these successors to change to that node. This causes $n-1=m/2$ lookup tables to change.
+
+To prove that no more than $2^{m-1}$ tables can be updated in any given configuration, suppose by way of contradiction that we have a ring with $2^{m-1} + 1 $ peers. Let $p_l$ be the peer with the largest id already in the ring, and let $p_s$ be the peer with the smallest id already in the ring. Let $p_n$ denote the new peer we are inserting. If every table needs updating, then the set of entries that need updating in each finger table $FT_i$ must at least include the largest entry $FT_i[m]$, or succ($p_i + 2^{m-1}$). We will note that the smallest possible id that $p_l$ could have is $p_s + 2^{m-1}$, since having it any smaller would contradict our inital assumption that the ring has $2^{m-1} + 1$ peers. The entry for $FT_s[m]$ before inserting is succ($p_s + 2^{m-1}$) which is less than or equal to the id of $p_l$. If the id of the $p_n$ is greater than that of $p_l$, then the finger table at $p_s$ won't be updated. If the id of $p_n$ is less than that of $p_l$ then the finger table at $p_l$ won't be updated. Therefore it is impossible to cause more than $2^{m-1}$ finger tables to update on a single insert. 
+\subsection*{b}
+Inserting a peer in this DHT always requires updating exactly one lookup table. Each peer's table contains only its immediate successor, i.e. succ($p+1$). Suppose inserting a peer $k$ required updating the lookup table for two distinct peers, $p$ and $q$. Then in the new DHT, succ($p+1)=$ succ($q+1)=k$. Then by definition, $k$ is the peer with the smallest id $\geq p+1$, so $q<p+1$, so $q\leq p$. $k$ is also the peer with the smallest id $\geq q+1$, so $p<q+1$, so $p\leq q$. Since $q \leq p$ and $p \leq q$, $p=q$. This contradicts the statement that $q$ and $p$ are distinct. Therefore, at most one distinct lookup table needs to be updated.
+\section{}
+\subsection*{a}
+From our proof in the lecture (slidedeck 3, slide 8), we know that the worst-case number of hops when doing a lookup is $\log_2(n)$, with $n$ being the number of peers in the ring. Since $n \leq 2^m$, the number of hops will always be less than $\log_2(2^m) = m$, which is a $f(m)$ that is linear in $m$.
+\subsection*{b}
+The worst-case scenario in the above solution is when $n = 2^m$. In this case, the number of hops to do a lookup will be exactly $\log_2(2^m) = m$. Therefore we can say the worst-case number of hops to do a lookup is $\geq g(m)$, where $g(m) = m$.
+\section{}
+\subsection*{a}
+This IP address is only in $N_2$. $N_2$ requires the first 24 bits of the IP address to match, which corresponds to the first three octets. $1.2.3.4$ matches the first three octets of $1.2.3.0$. $N_1$ requires matching the first 28 bits of the IP address to match the subnetwork's. This requires the first three octets to match, and also the first four bits of the last octet. The last octet of the subnetwork is $160_{10}=10100000_{2}$. The first three octets of the IP address match, but the last octet is $4_{10}=00000100_{2}$. The first four bits do not match.
+\subsection*{b}
+This IP address is only in $N_2$. It is in $N_2$ for similar reasons as in (a): the first three octets (1.2.3) match. $195_{10}=11000011_{2}$, the first four bits of which ($1100$) do not match the first four of the subnetwork's fourth octet ($1010$), so it is not in $N_1$.
+\subsection*{c}
+This IP address is in both $N_1$ and $N_2$. It is in $N_2$ for similar reasons as in (a): the first three octets (1.2.3) match. $171_{10}=10101011_{2}$, the first four bits of which ($1010$) match the first four of the subnetwork's fourth octet ($1010$), so it is in $N_1$.
+\end{document}
