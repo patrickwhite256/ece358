@@ -4,6 +4,7 @@
 #include <arpa/inet.h>
 #include <iostream>
 #include <netinet/tcp.h>
+#include <sstream>
 #include <sys/socket.h>
 #include <sys/types.h>
 
@@ -15,6 +16,7 @@ const int INITIAL_BUFFER_LEN = 300;
 const char *ALL_KEYS         = "allkeys";
 const char *ADD_KEY          = "addakey";
 const char *REQUEST_INFO     = "reqinfo";
+const char *PEER_DATA        = "peerdta";
 
 void die_on_error() {
     std::perror("error:");
@@ -124,19 +126,15 @@ void Daemon::send_command(const char *cmd_id, char *cmd_body, int body_len, sock
     }
 }
 
-void Daemon::broadcast(char *cmd_id, char *cmd_body, int body_len, Peer *start) {
-    if (start->id != this->peer_id) {
-        send_command(cmd_id, cmd_body, body_len, &start->address);
-    }
+void Daemon::broadcast(char *cmd_id, char *cmd_body, int body_len) {
+    Peer *next = peer_set;
 
-    Peer *next = start->next;
-
-    while(next != start) {
-        if (next->id == this->peer_id) continue;
-
-        send_command(cmd_id, cmd_body, body_len, &next->address);
+    do {
+        if (next->id != this->peer_id) {
+            send_command(cmd_id, cmd_body, body_len, &next->address);
+        }
         next = next->next;
-    }
+    } while (next != peer_set);
 }
 
 void Daemon::connect(const char *remote_ip, int remote_port) {
@@ -148,6 +146,35 @@ void Daemon::connect(const char *remote_ip, int remote_port) {
     remote.sin_port = remote_port;
     send_command(REQUEST_INFO, (char *)"", 0, &remote); //can throw Exception
     Message *net_info = receive_message();
+    if (strcmp(net_info->command, PEER_DATA) != 0) {
+        throw Exception(PROTOCOL_VIOLATION);
+    }
     // TODO: reconfigure peer set
     delete net_info;
+}
+
+Daemon::~Daemon() {
+    Peer *next = peer_set;
+    do {
+        Peer *tmp = next;
+        next = tmp->next;
+        delete tmp;
+    } while(next != peer_set);
+}
+
+// a REQUEST_INFO message means a new peer is joining the network.
+// what the node must do:
+// assign the new peer an id (one higher than the current highest id)
+// broadcast the peer's data to the other peers
+// respond to the initial request with the peer's new id and data about all the other peers
+// add it to the peer list, right before the current peer
+void Daemon::process_request_info(Message *message) {
+}
+
+// a NEW_PEER message means that a new peer is joining the network.
+// it has already been received by another node.
+// what the node must do:
+// add the new peer to the peer list, right before the current peer
+void Daemon::process_new_peer(Message *message) {
+
 }
