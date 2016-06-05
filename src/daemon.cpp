@@ -126,7 +126,7 @@ void Daemon::send_command(const char *cmd_id, char *cmd_body, int body_len, sock
     }
 }
 
-void Daemon::broadcast(char *cmd_id, char *cmd_body, int body_len) {
+void Daemon::broadcast(const char *cmd_id, char *cmd_body, int body_len) {
     Peer *next = peer_set;
 
     do {

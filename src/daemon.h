@@ -22,7 +22,7 @@ class Daemon {
     Peer *peer_set;
 
     void send_command(const char *cmd_id, char *cmd_body, int body_len, sockaddr_in *dest);
-    void broadcast(char *cmd_id, char *cmd_body, int body_len);
+    void broadcast(const char *cmd_id, char *cmd_body, int body_len);
     Message *receive_message();
 
     // Methods that broadcast messages
