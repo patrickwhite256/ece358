@@ -23,5 +23,5 @@ clean:
 
 ####################################################################
 
-$(BIN_DIR)/addpeer: build/daemon.o build/peer.o build/add_peer.o
+$(BIN_DIR)/addpeer: build/daemon.o build/peer.o build/add_peer.o build/util.o
 	$(CXX) $(CXXFLAGS) $^ -o $@
