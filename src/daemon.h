@@ -1,3 +1,4 @@
+#include <vector>
 #include <netinet/in.h>
 #include <unistd.h>
 
@@ -27,19 +28,21 @@ class Daemon {
 
     int send_command(const char *cmd_id, const char *cmd_body, int body_len,
                      sockaddr_in *dest, int sock = -1);
-    void broadcast(const char *cmd_id, const char *cmd_body, int body_len);
+    std::vector<int> broadcast(const char *cmd_id, char *cmd_body, int body_len);
     Message *receive_message(int sock = -1);
     char *int_to_msg_body(int i); // it is the responsibility of the caller to deallocate the char* returned by this
+    void close_all(std::vector<int> fd_list);
+    std::vector<Message*> wait_for_all(std::vector<int> fd_list);
 
     // Methods that broadcast messages
     void broadcast_tick_fwd();
     void broadcast_tick_back();
     void broadcast_update_total(int total);
-    void broadcast_remove_key(int key);
-    void broadcast_get_key(int key);
-    void send_add_key(Peer *dest, int key, const char *val);
+    std::vector<int> broadcast_remove_key(int key);
+    std::vector<int> broadcast_get_key(int key);
+    int send_add_key(Peer *dest, int key, const char *val);
     void send_content_response(Peer *dest, const char* content);
-    void send_add_content(Peer *dest, const char* content);
+    int send_add_content(Peer *dest, const char* content);
     void send_key_response(Peer *dest, int key);
     void send_no_key(Peer *dest);
 
