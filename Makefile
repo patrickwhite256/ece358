@@ -1,6 +1,6 @@
 CXX=g++
 CXXFLAGS= -g -Wall
-EXECS= addpeer
+EXECS= addpeer allkeys
 BIN_DIR=bin
 _EXECS=$(patsubst %,$(BIN_DIR)/%, $(EXECS))
 _OBJECTS=$(patsubst src/%.cpp,build/%.o, $(wildcard src/*.cpp))
@@ -24,4 +24,7 @@ clean:
 ####################################################################
 
 $(BIN_DIR)/addpeer: build/daemon.o build/peer.o build/add_peer.o build/util.o
+	$(CXX) $(CXXFLAGS) $^ -o $@
+
+$(BIN_DIR)/allkeys: build/allkeys.o build/util.o
 	$(CXX) $(CXXFLAGS) $^ -o $@

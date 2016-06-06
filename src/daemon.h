@@ -61,6 +61,7 @@ class Daemon {
     void proccess_add_content(Message *message);
     void process_key_response(Message *message);
     void process_no_key(Message *message);
+    void process_allkeys(Message *message);
 
     // Methods that process messages from the client
     void process_client_remove_peer(Message *message);
