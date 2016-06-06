@@ -169,6 +169,21 @@ std::vector<int> Daemon::broadcast(const char *cmd_id, const char *cmd_body, int
     return sockfds;
 }
 
+void Daemon::close_all(std::vector<int> fd_list) {
+    for(int i = 0; i < fd_list.size(); ++i) {
+        close(fd_list.at(i));
+    }
+}
+
+std::vector<Daemon::Message*> Daemon::wait_for_all(std::vector<int> fd_list) {
+    std::vector<Daemon::Message*> msgs;
+    for(int i = 0; i < fd_list.size(); ++i) {
+       msgs.push_back(receive_message(fd_list.at(i)));
+    }
+
+    return msgs;
+}
+
 void Daemon::connect(const char *remote_ip, unsigned short remote_port) {
     in_addr addr;
     sockaddr_in remote;
