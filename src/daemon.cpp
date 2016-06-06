@@ -154,26 +154,19 @@ int Daemon::send_command(const char *cmd_id, const char *cmd_body,
     return sock;
 }
 
-void Daemon::broadcast(const char *cmd_id, const char *cmd_body, int body_len) {
+std::vector<int> Daemon::broadcast(const char *cmd_id, const char *cmd_body, int body_len) {
+    std::vector<int> sockfds;
+
     Peer *next = peer_set;
 
     do {
         if (next->id != this->peer_id) {
-            send_command(cmd_id, cmd_body, body_len, &next->address);
+            sockfds.push_back(send_command(cmd_id, cmd_body, body_len, &next->address));
         }
         next = next->next;
     } while (next != peer_set);
-}
 
-char *Daemon::int_to_msg_body(int i) {
-    std::ostringstream ostr;
-    ostr << i;
-
-    std::string body_str = ostr.str();
-    char *body = new char[body_str.length() + 1];
-    std::strcpy(body, body_str.c_str());
-
-    return body;
+    return sockfds;
 }
 
 void Daemon::connect(const char *remote_ip, unsigned short remote_port) {
@@ -365,10 +358,12 @@ void Daemon::broadcast_update_total(int total) {
  *   key - integer
  *      the key to be removed
  */
-void Daemon::broadcast_remove_key(int key) {
+std::vector<int> Daemon::broadcast_remove_key(int key) {
     char *body = int_to_msg_body(key);
-    broadcast(REMOVE_KEY, body, strlen(body) + 1);
+    std::vector<int> sockfds = broadcast(REMOVE_KEY, body, strlen(body) + 1);
     delete[] body;
+
+    return sockfds;
 }
 
 /*
@@ -382,7 +377,7 @@ void Daemon::broadcast_remove_key(int key) {
  *      the id of the peer that is requesting the content
  */
 
-void Daemon::broadcast_get_key(int key) {
+std::vector<int> Daemon::broadcast_get_key(int key) {
     char *key_str = int_to_msg_body(key);
     char *source = int_to_msg_body(peer_id);
     char *body = new char[strlen(key_str) + strlen(source) + 2];
@@ -391,11 +386,13 @@ void Daemon::broadcast_get_key(int key) {
     body[strlen(key_str)] = ';';
     strcpy(&body[strlen(key_str) + 1], source);
 
-    broadcast(GET_KEY, body, strlen(body) + 1);
+    std::vector<int> sockfds = broadcast(GET_KEY, body, strlen(body) + 1);
 
     delete[] key_str;
     delete[] source;
     delete[] body;
+
+    return sockfds;
 }
 
 /*
@@ -409,7 +406,7 @@ void Daemon::broadcast_get_key(int key) {
  *      the string that the key maps to
  */
 
-void Daemon::send_add_key(Peer *dest, int key, const char *val) {
+int Daemon::send_add_key(Peer *dest, int key, const char *val) {
     char *key_str = int_to_msg_body(key);
     char *body = new char[strlen(key_str) + strlen(val) + 2];
 
@@ -417,10 +414,12 @@ void Daemon::send_add_key(Peer *dest, int key, const char *val) {
     body[strlen(key_str)] = ';';
     strcpy(&body[strlen(key_str) + 1], val);
 
-    send_command(ADD_KEY, body, strlen(body) + 1, &(dest->address));
+    int sockfd = send_command(ADD_KEY, body, strlen(body) + 1, &(dest->address));
 
     delete[] key_str;
     delete[] body;
+
+    return sockfd;
 }
 
 /*
@@ -453,7 +452,7 @@ void Daemon::send_content_response(Peer *dest, const char* content) {
  *      the id of the peer that sent the message
  */
 
-void Daemon::send_add_content(Peer *dest, const char* content) {
+int Daemon::send_add_content(Peer *dest, const char* content) {
     char *source = int_to_msg_body(peer_id);
     char *body = new char[strlen(content) + strlen(source) + 2];
 
@@ -461,10 +460,12 @@ void Daemon::send_add_content(Peer *dest, const char* content) {
     body[strlen(content)] = ';';
     strcpy(&body[strlen(content) + 1], source);
 
-    send_command(ADD_CONTENT, body, strlen(body) + 1, &(dest->address));
+    int sockfd = send_command(ADD_CONTENT, body, strlen(body) + 1, &(dest->address));
 
     delete[] source;
     delete[] body;
+
+    return sockfd;
 }
 
 /*

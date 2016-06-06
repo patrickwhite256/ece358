@@ -28,7 +28,7 @@ class Daemon {
 
     int send_command(const char *cmd_id, const char *cmd_body, int body_len,
                      sockaddr_in *dest, int sock = -1);
-    std::vector<int> broadcast(const char *cmd_id, char *cmd_body, int body_len);
+    std::vector<int> broadcast(const char *cmd_id, const char *cmd_body, int body_len);
     Message *receive_message(int sock = -1);
     char *int_to_msg_body(int i); // it is the responsibility of the caller to deallocate the char* returned by this
     void close_all(std::vector<int> fd_list);
