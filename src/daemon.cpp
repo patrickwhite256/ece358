@@ -7,15 +7,13 @@
 #include <sys/socket.h>
 #include <sys/types.h>
 
-#include "util.h"
-#include "daemon.h"
-#include "peer.h"
 #include "basic_exception.h"
-
-const int INITIAL_BUFFER_LEN = 300;
+#include "daemon.h"
+#include "messages.h"
+#include "peer.h"
+#include "util.h"
 
 // messages that can be heard while listening
-const char *ALL_KEYS         = "allkeys";
 const char *ADD_KEY          = "addakey";
 const char *REQUEST_INFO     = "reqinfo";
 const char *NEW_PEER         = "newpeer";
