@@ -47,6 +47,7 @@ void Daemon::loop() {
     while(true) {
         Daemon::Message *message = receive_message();
         if(strcmp(message->command, ALL_KEYS) == 0) {
+            process_allkeys(message);
         } else if (strcmp(message->command, ADD_KEY) == 0) {
         } else if (strcmp(message->command, REQUEST_INFO) == 0) {
             process_request_info(message);
@@ -170,14 +171,14 @@ std::vector<int> Daemon::broadcast(const char *cmd_id, const char *cmd_body, int
 }
 
 void Daemon::close_all(std::vector<int> fd_list) {
-    for(int i = 0; i < fd_list.size(); ++i) {
+    for(size_t i = 0; i < fd_list.size(); ++i) {
         close(fd_list.at(i));
     }
 }
 
 std::vector<Daemon::Message*> Daemon::wait_for_all(std::vector<int> fd_list) {
     std::vector<Daemon::Message*> msgs;
-    for(int i = 0; i < fd_list.size(); ++i) {
+    for(size_t i = 0; i < fd_list.size(); ++i) {
        msgs.push_back(receive_message(fd_list.at(i)));
     }
 
@@ -330,6 +331,13 @@ void Daemon::process_peer_data(Message *message) {
     me->previous = peer_set;
 
     peer_set = me->next;
+}
+
+void Daemon::process_allkeys(Message *message) {
+    const char *keys = "82,48,66,1";
+    if(send(message->connection, keys, strlen(keys) + 1, 0) < 0 ) {
+        die_on_error();
+    }
 }
 
 void Daemon::broadcast_tick_fwd() {
