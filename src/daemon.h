@@ -42,11 +42,14 @@ class Daemon {
     void broadcast_update_total(int total);
     std::vector<int> broadcast_remove_key(int key);
     std::vector<int> broadcast_get_key(int key);
+    std::vector<int> broadcast_remove_peer(int key);
     int send_add_key(Peer *dest, int key, const char *val);
     void send_content_response(Peer *dest, const char* content);
     int send_add_content(Peer *dest, const char* content);
     void send_key_response(Peer *dest, int key);
     void send_no_key(Peer *dest);
+    void send_destroy_peer(Peer *dest);
+    void send_ack_destroy(Peer *dest);
 
     // Methods that process messages
     void process_tick_fwd();

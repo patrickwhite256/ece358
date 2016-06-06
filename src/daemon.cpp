@@ -23,11 +23,14 @@ const char *UPDATE_TOTALS    = "upd8tot";
 const char *REMOVE_KEY       = "remvkey";
 const char *GET_KEY          = "getakey";
 const char *ADD_CONTENT      = "addcont";
+const char *DESTROY_PEER     = "destroy";
+const char *REMOVE_PEER      = "rempeer";
 
 // messages that are part of protocols
 const char *PEER_DATA        = "peerdta";
 const char *CONTENT_RESPONSE = "content";
 const char *NO_KEY           = "nokey4u";
+const char *ACK_DESTROY      = "ackdest";
 
 Daemon::Daemon(int sockfd, sockaddr_in server_addr) {
     this->sockfd = sockfd;
@@ -418,6 +421,25 @@ std::vector<int> Daemon::broadcast_get_key(int key) {
 }
 
 /*
+ * Message Purpose
+ *   tells all other peers that the peer with the given id is dying
+ *
+ * Message Body Format: id
+ *   id - integer
+ *      the id of the dying peer
+ */
+
+std::vector<int> Daemon::broadcast_remove_peer(int id) {
+    char *body = int_to_msg_body(id);
+
+    std::vector<int> sockfds = broadcast(REMOVE_PEER, body, strlen(body) + 1);
+
+    delete[] body;
+
+    return sockfds;
+}
+
+/*
  * Message purpose
  *   sends a key to the table of a specific peer
  *
@@ -496,6 +518,29 @@ int Daemon::send_add_content(Peer *dest, const char* content) {
  *
  * This message has no body
  */
+
 void Daemon::send_no_key(Peer *dest) {
     send_command(NO_KEY, NULL, 0, &(dest->address));
+}
+
+/*
+ * Message Purpose
+ *   tells a peer to kill itself and redistribute its keys across the rest of the network
+ *
+ * This message has no body
+ */
+
+void Daemon::send_destroy_peer(Peer *dest) {
+    send_command(DESTROY_PEER, NULL, 0, &(dest->address));
+}
+
+/*
+ * Message purpose
+ *   indicates to a dying peer that the sender has removed it from its peer list
+ *
+ * This message has no body
+ */
+
+void Daemon::send_ack_destroy(Peer *dest) {
+    send_command(ACK_DESTROY, NULL, 0, &(dest->address));
 }
