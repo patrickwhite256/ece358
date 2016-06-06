@@ -333,11 +333,12 @@ void Daemon::process_peer_data(Message *message) {
 }
 
 void Daemon::broadcast_tick_fwd() {
-   broadcast(TICK_FWD, NULL, 0);
+   close_all(broadcast(TICK_FWD, NULL, 0));
+
 }
 
 void Daemon::broadcast_tick_back() {
-    broadcast(TICK_BACK, NULL, 0);
+    close_all(broadcast(TICK_BACK, NULL, 0));
 }
 
 /*
@@ -359,7 +360,7 @@ void Daemon::broadcast_update_total(int total) {
     body[strlen(new_total)] = ';';
     strcpy(&body[strlen(new_total) + 1], source);
 
-    broadcast(UPDATE_TOTALS, body, strlen(body) + 1);
+    close_all(broadcast(UPDATE_TOTALS, body, strlen(body) + 1));
     delete[] new_total;
     delete[] source;
     delete[] body;
