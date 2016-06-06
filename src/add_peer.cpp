@@ -7,6 +7,7 @@
 #include <net/if.h>
 #include <unistd.h>
 
+#include "util.h"
 #include "daemon.h"
 #include "basic_exception.h"
 
@@ -51,16 +52,21 @@ int main(int argc, char **argv) {
         die_on_error();
     }
 
-    if(daemon(0, 1) < 0) { // fork process
-        die_on_error();
-    }
+    /* if(daemon(0, 1) < 0) { // fork process */
+    /*     die_on_error(); */
+    /* } */
 
-    Daemon dmon(sockfd);
+    Daemon dmon(sockfd, server);
     if (argc > 1) { //connect to peer
+        if (argc != 3) {
+            std::cerr << "invalid arguments" << std::endl;
+            exit(-1);
+        }
         try {
-            dmon.connect(argv[1], atoi(argv[2]));
+            dmon.connect(argv[1], htons(atoi(argv[2])));
         } catch (Exception ex) {
-            std::cerr << "Error: no such peer";
+            std::cerr << ex.what() << std::endl;
+            std::cerr << "Error: no such peer" << std::endl;
             exit(-1);
         }
     }
