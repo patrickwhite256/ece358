@@ -22,11 +22,10 @@ const char *NEW_PEER         = "newpeer";
 // messages that are part of protocols
 const char *PEER_DATA        = "peerdta";
 
-Daemon::Daemon(int sockfd) {
+Daemon::Daemon(int sockfd, sockaddr_in server_addr) {
     this->sockfd = sockfd;
     this->peer_id = 0; // assume we are the first node until told otherwise
-    sockaddr_in dummy;
-    peer_set = new Peer(dummy, 0, 0);
+    peer_set = new Peer(server_addr, 0, 0);
     peer_set->next = peer_set;
     peer_set->previous = peer_set;
 }
@@ -49,17 +48,29 @@ void Daemon::loop() {
     }
 }
 
-Daemon::Message *Daemon::receive_message() {
+void Daemon::print_peers() {
+    Peer *next = peer_set;
+    do {
+        std::cout << next->id << ") "
+                  << inet_ntoa(next->address.sin_addr) << ":"
+                  << ntohs(next->address.sin_port) << std::endl;
+        next = next->next;
+    } while (next != peer_set);
+}
+
+Daemon::Message *Daemon::receive_message(int sock) {
     unsigned char initial_buffer[INITIAL_BUFFER_LEN];
     sockaddr_in client;
     socklen_t alen = sizeof(sockaddr_in);
-    int connectedsock = accept(sockfd, (sockaddr *)&client, &alen);
-    if(connectedsock < 0) {
-        die_on_error();
+    if(sock == -1) {
+        sock = accept(sockfd, (sockaddr *)&client, &alen);
+        if(sock < 0) {
+            die_on_error();
+        }
     }
-    std::cout << "connected" << std::endl;
-    ssize_t recv_len = recv(connectedsock, initial_buffer,
-                            INITIAL_BUFFER_LEN, 0);
+    std::cout << "connection from " << inet_ntoa(client.sin_addr)
+              << ":" << client.sin_port << std::endl;
+    ssize_t recv_len = recv(sock, initial_buffer, INITIAL_BUFFER_LEN, 0);
     if(recv_len < 0) {
         die_on_error();
     }
@@ -72,7 +83,7 @@ Daemon::Message *Daemon::receive_message() {
 
     if(strcmp(cmd, ALL_KEYS) == 0) {
         char *dummy = new char[1];
-        return new Daemon::Message(cmd, 0, dummy, client);
+        return new Daemon::Message(cmd, 0, dummy, client, sock);
     } else {
         int msg_size = (initial_buffer[7] << 8) + initial_buffer[8];
         char *contents = new char[msg_size + 1];
@@ -81,40 +92,41 @@ Daemon::Message *Daemon::receive_message() {
         memcpy(contents, &initial_buffer[9], amt_from_first_packet);
         msg_remaining -= amt_from_first_packet;
         while(msg_remaining) {
-            recv_len = recv(connectedsock, &contents[msg_size - msg_remaining],
+            recv_len = recv(sock, &contents[msg_size - msg_remaining],
                             msg_remaining, 0);
             msg_remaining -= recv_len;
         }
         contents[msg_size] = '\0';
 
-        return new Daemon::Message(cmd, msg_size, contents, client);
+        return new Daemon::Message(cmd, msg_size, contents, client, sock);
     }
 }
 
-void Daemon::send_command(const char *cmd_id, const char *cmd_body, int body_len, sockaddr_in *dest) {
-    int sock = -1;
-    if((sock = socket(AF_INET, SOCK_STREAM, 0)) < 0) {
-        die_on_error();
-    }
+int Daemon::send_command(const char *cmd_id, const char *cmd_body,
+                          int body_len, sockaddr_in *dest, int sock) {
+    if(dest != NULL) {
+        if((sock = socket(AF_INET, SOCK_STREAM, 0)) < 0) {
+            die_on_error();
+        }
 
-    struct sockaddr_in client;
-    bzero(&client, sizeof(struct sockaddr_in));
-    client.sin_family = AF_INET;
-    client.sin_addr.s_addr = htonl(INADDR_ANY);
-    client.sin_port = 0;
-    if(bind(sock, (struct sockaddr *)&client, sizeof(struct sockaddr_in)) < 0) {
-        die_on_error();
-    }
+        struct sockaddr_in client;
+        bzero(&client, sizeof(struct sockaddr_in));
+        client.sin_family = AF_INET;
+        client.sin_addr.s_addr = htonl(INADDR_ANY);
+        client.sin_port = 0;
+        if(bind(sock, (struct sockaddr *)&client, sizeof(struct sockaddr_in)) < 0) {
+            die_on_error();
+        }
 
-    socklen_t alen = sizeof(struct sockaddr_in);
-    if(getsockname(sock, (struct sockaddr *)&client, &alen) < 0) {
-        die_on_error();
-    }
+        socklen_t alen = sizeof(struct sockaddr_in);
+        if(getsockname(sock, (struct sockaddr *)&client, &alen) < 0) {
+            die_on_error();
+        }
+        if(::connect(sock, (struct sockaddr *)dest, sizeof(struct sockaddr_in)) < 0) {
+            throw Exception(BAD_ADDRESS);
+        }
 
-    if(::connect(sock, (struct sockaddr *)dest, sizeof(struct sockaddr_in)) < 0) {
-        throw Exception(BAD_ADDRESS);
     }
-
     size_t msglen = body_len + 9;
     char msg[msglen];
     memcpy(msg, cmd_id, 7);
@@ -130,10 +142,7 @@ void Daemon::send_command(const char *cmd_id, const char *cmd_body, int body_len
     if((sentlen = send(sock, msg, msglen, 0)) < 0 ) {
         die_on_error();
     }
-
-    if(shutdown(sock, SHUT_RDWR) < 0) {
-        die_on_error();
-    }
+    return sock;
 }
 
 void Daemon::broadcast(const char *cmd_id, const char *cmd_body, int body_len) {
@@ -154,14 +163,18 @@ void Daemon::connect(const char *remote_ip, unsigned short remote_port) {
     remote.sin_family = AF_INET;
     remote.sin_addr = addr;
     remote.sin_port = remote_port;
-    std::cout << inet_ntoa(remote.sin_addr) << std::endl;
-    std::cout << remote.sin_port << std::endl;
-    send_command(REQUEST_INFO, (char *)"", 0, &remote); //can throw Exception
-    Message *net_info = receive_message();
+    std::stringstream stream;
+    stream << inet_ntoa(peer_set->address.sin_addr) << ";"
+           << peer_set->address.sin_port;
+    int sock = send_command(REQUEST_INFO, stream.str().c_str(), stream.str().length(), &remote); //can throw Exception
+    Message *net_info = receive_message(sock);
+    close(sock);
     if (strcmp(net_info->command, PEER_DATA) != 0) {
         throw Exception(PROTOCOL_VIOLATION);
     }
-    process_request_info(net_info);
+    process_peer_data(net_info);
+
+    print_peers();
     // TODO: get keys from other peers
     delete net_info;
 }
@@ -175,6 +188,8 @@ Daemon::~Daemon() {
     } while(next != peer_set);
 }
 
+// REQUEST_INFO message format:
+// remote_ip;remote_port
 // a REQUEST_INFO message means a new peer is joining the network.
 // what the node must do:
 // assign the new peer an id (one higher than the current highest id)
@@ -193,10 +208,18 @@ void Daemon::process_request_info(Message *message) {
     } while (next != peer_set);
 
     // broadcast new peer data
-    Peer *new_peer = new Peer(message->client, 0, max_id + 1);
+    std::vector<std::string> tokens = tokenize(message->body, ";");
+    in_addr addr;
+    sockaddr_in peer_addr;
+    inet_aton(tokens[0].c_str(), &addr);
+    peer_addr.sin_family = AF_INET;
+    peer_addr.sin_addr = addr;
+    peer_addr.sin_port = atoi(tokens[1].c_str());
+
+    Peer *new_peer = new Peer(peer_addr, 0, max_id + 1);
     std::stringstream stream;
-    stream << inet_ntoa(message->client.sin_addr) << ";"
-           << message->client.sin_port << ";"
+    stream << tokens[0].c_str() << ";"
+           << tokens[1].c_str() << ";"
            << new_peer->id;
     broadcast(NEW_PEER, stream.str().c_str(), stream.str().length());
 
@@ -214,14 +237,17 @@ void Daemon::process_request_info(Message *message) {
         next = next->next;
     } while (next != peer_set);
     send_command(PEER_DATA, stream.str().c_str(), stream.str().length(),
-                 &message->client);
+                 NULL, message->connection);
+    close(message->connection);
 
     // add to peer list
     Peer *prev = peer_set->previous;
     new_peer->previous = prev;
     new_peer->next = peer_set;
-    prev->next = peer_set;
-    peer_set->previous = peer_set;
+    prev->next = new_peer;
+    peer_set->previous = new_peer;
+
+    print_peers();
 }
 
 // NEW_PEER message format:
@@ -243,8 +269,10 @@ void Daemon::process_new_peer(Message *message) {
 
     new_peer->previous = prev;
     new_peer->next = peer_set;
-    prev->next = peer_set;
-    peer_set->previous = peer_set;
+    prev->next = new_peer;
+    peer_set->previous = new_peer;
+
+    print_peers();
 }
 
 // PEER_DATA message format:
@@ -264,7 +292,7 @@ void Daemon::process_peer_data(Message *message) {
         peer_addr.sin_addr = addr;
         peer_addr.sin_port = atoi(tokens[i + 3].c_str());
         Peer *new_peer = new Peer(peer_addr,
-                                  atoi(tokens[i + 9].c_str()),
+                                  atoi(tokens[i + 2].c_str()),
                                   atoi(tokens[i].c_str()));
         peer_set->next = new_peer;
         new_peer->previous = peer_set;
