@@ -1,3 +1,6 @@
+#ifndef DAEMON_H
+#define DAEMON_H
+
 #include <vector>
 #include <netinet/in.h>
 #include <unistd.h>
@@ -78,3 +81,5 @@ class Daemon {
     void connect(const char *remote_ip, unsigned short remote_port);
     void loop();
 };
+
+#endif

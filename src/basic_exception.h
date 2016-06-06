@@ -1,3 +1,6 @@
+#ifndef BASIC_EXCEPTION_H
+#define BASIC_EXCEPTION_H
+
 #include <exception>
 #include <string>
 
@@ -27,3 +30,5 @@ class Exception: public std::exception {
         return msg.c_str();
     }
 };
+
+#endif
