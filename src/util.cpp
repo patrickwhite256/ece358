@@ -4,6 +4,7 @@
 #include <cstring>
 
 #include <iostream>
+#include <sstream>
 
 #include "util.h"
 
@@ -28,4 +29,15 @@ std::vector<std::string> tokenize(const char *c_str, const char *delimiter) {
         pos = next + delim_len;
     }
     return tokens;
+}
+
+char *int_to_msg_body(int i) {
+    std::ostringstream ostr;
+    ostr << i;
+
+    std::string body_str = ostr.str();
+    char *body = new char[body_str.length() + 1];
+    std::strcpy(body, body_str.c_str());
+
+    return body;
 }

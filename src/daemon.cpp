@@ -13,14 +13,23 @@
 #include "basic_exception.h"
 
 const int INITIAL_BUFFER_LEN = 300;
+
 // messages that can be heard while listening
 const char *ALL_KEYS         = "allkeys";
 const char *ADD_KEY          = "addakey";
 const char *REQUEST_INFO     = "reqinfo";
 const char *NEW_PEER         = "newpeer";
+const char *TICK_FWD         = "tickfwd";
+const char *TICK_BACK        = "tickbac";
+const char *UPDATE_TOTALS    = "upd8tot";
+const char *REMOVE_KEY       = "remvkey";
+const char *GET_KEY          = "getakey";
+const char *ADD_CONTENT      = "addcont";
 
 // messages that are part of protocols
 const char *PEER_DATA        = "peerdta";
+const char *CONTENT_RESPONSE = "content";
+const char *NO_KEY           = "nokey4u";
 
 Daemon::Daemon(int sockfd, sockaddr_in server_addr) {
     this->sockfd = sockfd;
@@ -145,15 +154,34 @@ int Daemon::send_command(const char *cmd_id, const char *cmd_body,
     return sock;
 }
 
-void Daemon::broadcast(const char *cmd_id, const char *cmd_body, int body_len) {
+std::vector<int> Daemon::broadcast(const char *cmd_id, const char *cmd_body, int body_len) {
+    std::vector<int> sockfds;
+
     Peer *next = peer_set;
 
     do {
         if (next->id != this->peer_id) {
-            send_command(cmd_id, cmd_body, body_len, &next->address);
+            sockfds.push_back(send_command(cmd_id, cmd_body, body_len, &next->address));
         }
         next = next->next;
     } while (next != peer_set);
+
+    return sockfds;
+}
+
+void Daemon::close_all(std::vector<int> fd_list) {
+    for(int i = 0; i < fd_list.size(); ++i) {
+        close(fd_list.at(i));
+    }
+}
+
+std::vector<Daemon::Message*> Daemon::wait_for_all(std::vector<int> fd_list) {
+    std::vector<Daemon::Message*> msgs;
+    for(int i = 0; i < fd_list.size(); ++i) {
+       msgs.push_back(receive_message(fd_list.at(i)));
+    }
+
+    return msgs;
 }
 
 void Daemon::connect(const char *remote_ip, unsigned short remote_port) {
@@ -302,4 +330,166 @@ void Daemon::process_peer_data(Message *message) {
     me->previous = peer_set;
 
     peer_set = me->next;
+}
+
+void Daemon::broadcast_tick_fwd() {
+   close_all(broadcast(TICK_FWD, NULL, 0));
+
+}
+
+void Daemon::broadcast_tick_back() {
+    close_all(broadcast(TICK_BACK, NULL, 0));
+}
+
+/*
+ * Message Purpose
+ *   broadcasts a message indicating that this peer has updated the number of keys it holds
+ *
+ * Message Body Format: new_total;source
+ *   new_total - integer
+ *      the new number of keys at this peer
+ *   source - integer
+ *      the id of the peer broadcasting the message
+ *
+ */
+void Daemon::broadcast_update_total(int total) {
+    char *new_total = int_to_msg_body(total);
+    char *source = int_to_msg_body(peer_id);
+    char *body = new char[strlen(new_total) + strlen(source) + 2];
+    strcpy(body, new_total);
+    body[strlen(new_total)] = ';';
+    strcpy(&body[strlen(new_total) + 1], source);
+
+    close_all(broadcast(UPDATE_TOTALS, body, strlen(body) + 1));
+    delete[] new_total;
+    delete[] source;
+    delete[] body;
+}
+
+/*
+ * Message Purpose
+ *   broadcasts a request to remove a particular key from the DHT
+ *
+ * Message Body Format: key
+ *   key - integer
+ *      the key to be removed
+ */
+std::vector<int> Daemon::broadcast_remove_key(int key) {
+    char *body = int_to_msg_body(key);
+    std::vector<int> sockfds = broadcast(REMOVE_KEY, body, strlen(body) + 1);
+    delete[] body;
+
+    return sockfds;
+}
+
+/*
+ * Message Purpose
+ *   broadcasts a request to retrieve the value of a particular key from the DHT
+ *
+ * Message Body Format: key;source
+ *   key - integer
+ *      the key of the content we want to return
+ *   source - integer
+ *      the id of the peer that is requesting the content
+ */
+
+std::vector<int> Daemon::broadcast_get_key(int key) {
+    char *key_str = int_to_msg_body(key);
+    char *source = int_to_msg_body(peer_id);
+    char *body = new char[strlen(key_str) + strlen(source) + 2];
+
+    strcpy(body, key_str);
+    body[strlen(key_str)] = ';';
+    strcpy(&body[strlen(key_str) + 1], source);
+
+    std::vector<int> sockfds = broadcast(GET_KEY, body, strlen(body) + 1);
+
+    delete[] key_str;
+    delete[] source;
+    delete[] body;
+
+    return sockfds;
+}
+
+/*
+ * Message purpose
+ *   sends a key to the table of a specific peer
+ *
+ * Message Body Format: key;val
+ *   key - integer
+ *      the key to be added
+ *   val - char*
+ *      the string that the key maps to
+ */
+
+int Daemon::send_add_key(Peer *dest, int key, const char *val) {
+    char *key_str = int_to_msg_body(key);
+    char *body = new char[strlen(key_str) + strlen(val) + 2];
+
+    strcpy(body, key_str);
+    body[strlen(key_str)] = ';';
+    strcpy(&body[strlen(key_str) + 1], val);
+
+    int sockfd = send_command(ADD_KEY, body, strlen(body) + 1, &(dest->address));
+
+    delete[] key_str;
+    delete[] body;
+
+    return sockfd;
+}
+
+/*
+ * Message Purpose
+ *   sends a string to the target peer (usually as a response to a request)
+ *
+ * Message Body Format: content
+ *   content - char*
+ *      the string we want to send
+ */
+
+void Daemon::send_content_response(Peer *dest, const char* content) {
+    char *body = new char[strlen(content) + 1];
+    strcpy(body, content);
+
+    send_command(CONTENT_RESPONSE, body, strlen(body) + 1, &(dest->address));
+
+    delete[] body;
+}
+
+
+/*
+ * Message Purpose
+ *   sends a string to the target peer with the intent to add it as a new key
+ *
+ * Message Body Format: content;source
+ *   content - char*
+ *      the string we want to send
+ *   source - int
+ *      the id of the peer that sent the message
+ */
+
+int Daemon::send_add_content(Peer *dest, const char* content) {
+    char *source = int_to_msg_body(peer_id);
+    char *body = new char[strlen(content) + strlen(source) + 2];
+
+    strcpy(body, content);
+    body[strlen(content)] = ';';
+    strcpy(&body[strlen(content) + 1], source);
+
+    int sockfd = send_command(ADD_CONTENT, body, strlen(body) + 1, &(dest->address));
+
+    delete[] source;
+    delete[] body;
+
+    return sockfd;
+}
+
+/*
+ * Message Purpose
+ *   tells a peer that a requested key was not found (in reply to a get key request)
+ *
+ * This message has no body
+ */
+void Daemon::send_no_key(Peer *dest) {
+    send_command(NO_KEY, NULL, 0, &(dest->address));
 }
