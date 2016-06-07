@@ -55,6 +55,8 @@ void Daemon::loop() {
             process_new_peer(message);
         } else if (strcmp(message->command, REMOVE_PEER) == 0) {
             process_client_remove_peer(message);
+        } else if (strcmp(message->command, PEER_REMOVAL) == 0) {
+            process_peer_removal(message);
         }
         delete message;
     }
@@ -82,22 +84,21 @@ Daemon::Message *Daemon::receive_message(int sock) {
     socklen_t alen = sizeof(sockaddr_in);
     if(sock == -1) {
         sock = accept(sockfd, (sockaddr *)&client, &alen);
+        std::cout << "connection from " << inet_ntoa(client.sin_addr)
+                  << ":" << ntohs(client.sin_port) << std::endl;
         if(sock < 0) {
             die_on_error();
         }
     }
-    std::cout << "connection from " << inet_ntoa(client.sin_addr)
-              << ":" << client.sin_port << std::endl;
     ssize_t recv_len = recv(sock, initial_buffer, INITIAL_BUFFER_LEN, 0);
     if(recv_len < 0) {
         die_on_error();
     }
-    std::cout << "received " << recv_len << std::endl;
 
     char *cmd = new char[8];
     memcpy(cmd, initial_buffer, 7);
     cmd[7] = '\0';
-    std::cout << cmd << std::endl;
+    std::cout << "received " << cmd << std::endl;
 
     if(strcmp(cmd, ALL_KEYS) == 0) {
         char *dummy = new char[1];
@@ -168,6 +169,7 @@ int Daemon::send_command(const char *cmd_id, const char *cmd_body,
     if (body_len > 0) {
         strcpy(&msg[9], cmd_body);
     }
+    std::cout << "sent " << cmd_id << std::endl;
 
     ssize_t sentlen;
     if((sentlen = send(sock, msg, msglen, 0)) < 0 ) {
@@ -235,19 +237,18 @@ std::vector<Daemon::Message*> Daemon::wait_for_all(std::vector<int> fd_list) {
  */
 Peer *Daemon::find_peer_by_addr(const char* addr, unsigned short sin_port) {
     Peer *next = peer_set;
-    Peer *match = NULL;
     do {
         if (sin_port == next->address.sin_port &&
             strcmp(addr, inet_ntoa(next->address.sin_addr)) == 0) {
 
-            return match;
+            return next;
         }
 
         next = next->next;
 
     } while (next != peer_set);
 
-    return match;
+    return NULL;
 }
 
 /*
@@ -459,8 +460,17 @@ void Daemon::process_allkeys(Message *message) {
  *        - remove peer from the set
  */
 void Daemon::process_peer_removal(Message *message) {
+    send_command(ACKNOWLEDGE, NULL, 0, NULL, message->connection);
     std::vector<std::string> tokens = tokenize(message->body, ";");
-    send_command(ACKNOWLEDGE, "", 0, NULL, message->connection);
+    Peer *to_remove = find_peer_by_addr(tokens[0].c_str(),
+                                        (unsigned short)atoi(tokens[1].c_str()));
+    to_remove->previous->next = to_remove->next;
+    to_remove->next->previous = to_remove->previous;
+    if (peer_set == to_remove)
+        peer_set = to_remove->next;
+    delete to_remove;
+
+    print_peers();
 }
 
 /*
@@ -469,6 +479,7 @@ void Daemon::process_peer_removal(Message *message) {
  * Actions:
  *        - broadcast PEER_REMOVAL to all peers
  *        - distribute keys
+ *        - send acknowledgement
  *        - terminate self
  */
 void Daemon::process_client_remove_peer(Message *message) {
@@ -479,6 +490,7 @@ void Daemon::process_client_remove_peer(Message *message) {
     wait_for_acks(
         broadcast(PEER_REMOVAL, stream.str().c_str(), stream.str().length())
     );
+    send_command(ACKNOWLEDGE, NULL, 0, NULL, message->connection);
     //TODO : distribute keys
     terminated = true;
 }
