@@ -23,6 +23,7 @@ const char *UPDATE_TOTALS    = "upd8tot";
 const char *REMOVE_KEY       = "remvkey";
 const char *GET_KEY          = "getakey";
 const char *ADD_CONTENT      = "addcont";
+const char *PEER_REMOVAL     = "iamdead";
 
 // messages that are part of protocols
 const char *PEER_DATA        = "peerdta";
@@ -35,6 +36,7 @@ Daemon::Daemon(int sockfd, sockaddr_in server_addr) {
     peer_set = new Peer(server_addr, 0, 0);
     peer_set->next = peer_set;
     peer_set->previous = peer_set;
+    terminated = false;
 }
 
 void Daemon::loop() {
@@ -42,7 +44,7 @@ void Daemon::loop() {
         die_on_error();
     }
 
-    while(true) {
+    while(!terminated) {
         Daemon::Message *message = receive_message();
         if(strcmp(message->command, ALL_KEYS) == 0) {
             process_allkeys(message);
@@ -51,6 +53,8 @@ void Daemon::loop() {
             process_request_info(message);
         } else if (strcmp(message->command, NEW_PEER) == 0) {
             process_new_peer(message);
+        } else if (strcmp(message->command, REMOVE_PEER) == 0) {
+            process_client_remove_peer(message);
         }
         delete message;
     }
@@ -200,6 +204,14 @@ Peer *Daemon::find_peer_by_addr(const char* addr, unsigned short sin_port) {
     return match;
 }
 
+void Daemon::wait_for_acks(std::vector<int> fd_list) {
+    std::vector<Daemon::Message*> msgs = wait_for_all(fd_list);
+    for (size_t i = 0; i < msgs.size(); ++i) {
+        if (strcmp(msgs[i]->command, ACKNOWLEDGE) != 0) throw Exception(PROTOCOL_VIOLATION);
+        delete msgs[i];
+    }
+}
+
 void Daemon::connect(const char *remote_ip, unsigned short remote_port) {
     in_addr addr;
     sockaddr_in remote;
@@ -230,6 +242,15 @@ Daemon::~Daemon() {
         next = tmp->next;
         delete tmp;
     } while(next != peer_set);
+}
+
+Peer *Daemon::me() {
+    Peer *next = peer_set;
+    do {
+        if (next->id == peer_id) return next;
+        next = next->next;
+    } while(next != peer_set);
+    return NULL;
 }
 
 // REQUEST_INFO message format:
@@ -265,7 +286,7 @@ void Daemon::process_request_info(Message *message) {
     stream << tokens[0].c_str() << ";"
            << tokens[1].c_str() << ";"
            << new_peer->id;
-    broadcast(NEW_PEER, stream.str().c_str(), stream.str().length());
+    wait_for_acks(broadcast(NEW_PEER, stream.str().c_str(), stream.str().length()));
 
     // reply to new peer with info
     stream.str(""); //reset stringstream
@@ -317,6 +338,7 @@ void Daemon::process_new_peer(Message *message) {
     peer_set->previous = new_peer;
 
     print_peers();
+    send_command(ACKNOWLEDGE, NULL, 0, NULL, message->connection);
 }
 
 // PEER_DATA message format:
@@ -353,6 +375,38 @@ void Daemon::process_allkeys(Message *message) {
     if(send(message->connection, keys, strlen(keys) + 1, 0) < 0 ) {
         die_on_error();
     }
+}
+
+/*
+ * Message: PEER_REMOVAL
+ * Body Format: ip_addr;port
+ * Actions:
+ *        - acknowledge message
+ *        - remove peer from the set
+ */
+void Daemon::process_peer_removal(Message *message) {
+    std::vector<std::string> tokens = tokenize(message->body, ";");
+    send_command(ACKNOWLEDGE, "", 0, NULL, message->connection);
+}
+
+/*
+ * Message: REMOVE_PEER
+ * Format: None
+ * Actions:
+ *        - broadcast PEER_REMOVAL to all peers
+ *        - distribute keys
+ *        - terminate self
+ */
+void Daemon::process_client_remove_peer(Message *message) {
+    Peer *self = me();
+    std::stringstream stream;
+    stream << inet_ntoa(self->address.sin_addr) << ";"
+           << self->address.sin_port;
+    wait_for_acks(
+        broadcast(PEER_REMOVAL, stream.str().c_str(), stream.str().length())
+    );
+    //TODO : distribute keys
+    terminated = true;
 }
 
 void Daemon::broadcast_tick_fwd() {

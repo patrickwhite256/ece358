@@ -28,14 +28,7 @@ class Daemon {
     int sockfd;
     int peer_id;
     Peer *peer_set;
-
-    int send_command(const char *cmd_id, const char *cmd_body, int body_len,
-                     sockaddr_in *dest, int sock = -1);
-    std::vector<int> broadcast(const char *cmd_id, const char *cmd_body, int body_len);
-    Message *receive_message(int sock = -1);
-    void close_all(std::vector<int> fd_list);
-    std::vector<Message*> wait_for_all(std::vector<int> fd_list);
-    Peer *find_peer_by_addr(const char *addr, unsigned short sin_port);
+    bool terminated;
 
     // Methods that broadcast messages
     void broadcast_tick_fwd();
@@ -56,7 +49,7 @@ class Daemon {
     void process_remove_key(Message *message);
     void process_get_key(Message *message);
     void process_add_peer(Message *message);
-    void process_remove_peer(Message *message);
+    void process_peer_removal(Message *message);
     void process_update_total(Message *message);
     void process_request_info(Message *message);
     void process_new_peer(Message *message);
@@ -72,6 +65,17 @@ class Daemon {
     void process_client_add_content(Message *message);
     void process_client_remove_content(Message *message);
     void process_client_lookup_content(Message *message);
+
+    //utilites
+    Peer *me();
+    int send_command(const char *cmd_id, const char *cmd_body, int body_len,
+                     sockaddr_in *dest, int sock = -1);
+    std::vector<int> broadcast(const char *cmd_id, const char *cmd_body, int body_len);
+    Message *receive_message(int sock = -1);
+    void close_all(std::vector<int> fd_list);
+    std::vector<Message*> wait_for_all(std::vector<int> fd_list);
+    Peer *find_peer_by_addr(const char *addr, unsigned short sin_port);
+    void wait_for_acks(std::vector<int> fd_list);
 
     //debug
     void print_peers();
