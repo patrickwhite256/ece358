@@ -35,6 +35,7 @@ class Daemon {
     Message *receive_message(int sock = -1);
     void close_all(std::vector<int> fd_list);
     std::vector<Message*> wait_for_all(std::vector<int> fd_list);
+    Peer *find_peer_by_addr(const char *addr, unsigned short sin_port);
 
     // Methods that broadcast messages
     void broadcast_tick_fwd();

@@ -183,6 +183,23 @@ std::vector<Daemon::Message*> Daemon::wait_for_all(std::vector<int> fd_list) {
     return msgs;
 }
 
+Peer *Daemon::find_peer_by_addr(const char* addr, unsigned short sin_port) {
+    Peer *next = peer_set;
+    Peer *match = NULL;
+    do {
+        if (sin_port == next->address.sin_port &&
+            strcmp(addr, inet_ntoa(next->address.sin_addr)) == 0) {
+
+            return match;
+        }
+
+        next = next->next;
+
+    } while (next != peer_set);
+
+    return match;
+}
+
 void Daemon::connect(const char *remote_ip, unsigned short remote_port) {
     in_addr addr;
     sockaddr_in remote;
