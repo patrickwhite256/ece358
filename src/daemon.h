@@ -20,8 +20,8 @@ class Daemon {
             client(client), connection(sockfd) {}
         ~Message() {
             close(connection);
-            delete command;
-            delete body;
+            delete[] command;
+            delete[] body;
         }
     };
 
