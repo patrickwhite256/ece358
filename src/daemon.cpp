@@ -70,6 +70,12 @@ void Daemon::print_peers() {
     } while (next != peer_set);
 }
 
+/*
+ * receive_message
+ *   receives a message and returns it as a Message
+ *   @param sock: socket file descriptor on which to receive message,
+ *                or -1 to accept a new connection
+ */
 Daemon::Message *Daemon::receive_message(int sock) {
     unsigned char initial_buffer[INITIAL_BUFFER_LEN];
     sockaddr_in client;
@@ -114,6 +120,19 @@ Daemon::Message *Daemon::receive_message(int sock) {
     }
 }
 
+/*
+ * send_command
+ *   send a command using the universal format
+ *   @param cmd_id   command to send (should be a constant defined here or in
+ *                   messages.h
+ *   @param cmd_body body of the message to send. can be NULL for no body.
+ *   @param body_len length of the body. must be 0 if cmd_body is NULL
+ *   @param dest     destination ip/port to send to. if not NULL, will open
+ *                   a new connection.
+ *   @param sock     socket file descriptor of an open connection to use.
+ *                   only used if dest is NULL
+ *   @return the socket file descriptor of the connection used
+ */
 int Daemon::send_command(const char *cmd_id, const char *cmd_body,
                           int body_len, sockaddr_in *dest, int sock) {
     if(dest != NULL) {
@@ -157,6 +176,15 @@ int Daemon::send_command(const char *cmd_id, const char *cmd_body,
     return sock;
 }
 
+/*
+ * broadcast
+ *   send a command to all connected peers
+ *   @param cmd_id   command to send (should be a constant defined here or in
+ *                   messages.h
+ *   @param cmd_body body of the message to send. can be NULL for no body.
+ *   @param body_len length of the body. must be 0 if cmd_body is NULL
+ *   @return a vector of the connection file descriptors used
+ */
 std::vector<int> Daemon::broadcast(const char *cmd_id, const char *cmd_body, int body_len) {
     std::vector<int> sockfds;
 
@@ -172,12 +200,23 @@ std::vector<int> Daemon::broadcast(const char *cmd_id, const char *cmd_body, int
     return sockfds;
 }
 
+/*
+ * close_all
+ *   close a list of file descriptors
+ *   @param fd_list the list of file descriptors to close
+ */
 void Daemon::close_all(std::vector<int> fd_list) {
     for(size_t i = 0; i < fd_list.size(); ++i) {
         close(fd_list.at(i));
     }
 }
 
+/*
+ * wait_for_all
+ *   wait for a message on each socket provided
+ *   @param fd_list a list of socket file descriptors to listen on
+ *   @return msgs a list of Message pointers, one from each socket.
+ */
 std::vector<Daemon::Message*> Daemon::wait_for_all(std::vector<int> fd_list) {
     std::vector<Daemon::Message*> msgs;
     for(size_t i = 0; i < fd_list.size(); ++i) {
@@ -187,6 +226,13 @@ std::vector<Daemon::Message*> Daemon::wait_for_all(std::vector<int> fd_list) {
     return msgs;
 }
 
+/*
+ * find_peer_by_addr
+ *   find a peer in the network by address and port
+ *   @param addr dotted quad represetation of ip address
+ *   @param port port in network order
+ *   @return matching Peer or NULL
+ */
 Peer *Daemon::find_peer_by_addr(const char* addr, unsigned short sin_port) {
     Peer *next = peer_set;
     Peer *match = NULL;
@@ -204,6 +250,11 @@ Peer *Daemon::find_peer_by_addr(const char* addr, unsigned short sin_port) {
     return match;
 }
 
+/*
+ * wait_for_acks
+ *   wait for each remote client to acknowledge a message, then close the socket.
+ *   @param fd_list a list of socket file descriptors to listen on
+ */
 void Daemon::wait_for_acks(std::vector<int> fd_list) {
     std::vector<Daemon::Message*> msgs = wait_for_all(fd_list);
     for (size_t i = 0; i < msgs.size(); ++i) {
@@ -212,6 +263,12 @@ void Daemon::wait_for_acks(std::vector<int> fd_list) {
     }
 }
 
+/*
+ * connect
+ *   connect this node to an existing network
+ *     @param remote_ip dotted quad representation of the ip address of a peer
+ *     @remote_port port of a peer, in network byte order
+ */
 void Daemon::connect(const char *remote_ip, unsigned short remote_port) {
     in_addr addr;
     sockaddr_in remote;
@@ -244,6 +301,10 @@ Daemon::~Daemon() {
     } while(next != peer_set);
 }
 
+/*
+ * me
+ *   return the Peer corresponding to this node.
+ */
 Peer *Daemon::me() {
     Peer *next = peer_set;
     do {
@@ -253,14 +314,15 @@ Peer *Daemon::me() {
     return NULL;
 }
 
-// REQUEST_INFO message format:
-// remote_ip;remote_port
-// a REQUEST_INFO message means a new peer is joining the network.
-// what the node must do:
-// assign the new peer an id (one higher than the current highest id)
-// broadcast the peer's data to the other peers
-// respond to the initial request with the peer's new id and data about all the other peers
-// add it to the peer list, right before the current peer
+/*
+ * Message: REQUEST_INFO
+ * Body Format: remote_ip;remote_port
+ * Actions:
+ *        - assign the new peer an id (one higher than the current highest id)
+ *        - broadcast the peer's data to all other peers
+ *        - respond to the initial request with the peer's id and information about the network
+ *        - add it to the peer list, right before the current head
+ */
 void Daemon::process_request_info(Message *message) {
     // determine max id
     int max_id = 0;
@@ -315,12 +377,12 @@ void Daemon::process_request_info(Message *message) {
     print_peers();
 }
 
-// NEW_PEER message format:
-// ip_address;port;peer_id
-// a NEW_PEER message means that a new peer is joining the network.
-// it has already been received by another node.
-// what the node must do:
-// add the new peer to the peer list, right before the current peer
+/*
+ * Message: NEW_PEER
+ * Body format: ip_address;port;peer_id
+ * Actions:
+ *        - add the new peer to the peer list, right before the current head
+ */
 void Daemon::process_new_peer(Message *message) {
     in_addr addr;
     std::vector<std::string> tokens = tokenize(message->body, ";");
@@ -341,9 +403,14 @@ void Daemon::process_new_peer(Message *message) {
     send_command(ACKNOWLEDGE, NULL, 0, NULL, message->connection);
 }
 
-// PEER_DATA message format:
-// new_peer_id;<peerdata>+
-//   peerdata: peer_id;key_count;ip_addr;port
+/*
+ * Message: PEER_DATA
+ * Body Format: new_peer_id;(peer_id;key_count;ip_addr;port)+
+ * Actions:
+ *        - assign own id to new_peer_id
+ *        - construct representation of network
+ *        - add self to network right before current head
+ */
 void Daemon::process_peer_data(Message *message) {
     std::vector<std::string> tokens = tokenize(message->body, ";");
     in_addr addr;
@@ -370,7 +437,14 @@ void Daemon::process_peer_data(Message *message) {
     peer_set = me->next;
 }
 
+/*
+ * Message: ALL_KEYS
+ * Body format: none (special)
+ * Actions:
+ *        - respond to message with comma-separated list of keys held by this peer
+ */
 void Daemon::process_allkeys(Message *message) {
+    //TODO: create list of keys
     const char *keys = "82,48,66,1";
     if(send(message->connection, keys, strlen(keys) + 1, 0) < 0 ) {
         die_on_error();
