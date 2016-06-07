@@ -29,10 +29,12 @@ const char *PEER_REMOVAL     = "iamdead";
 const char *PEER_DATA        = "peerdta";
 const char *CONTENT_RESPONSE = "content";
 const char *NO_KEY           = "nokey4u";
+const char *KEY_RESPONSE     = "keyresp";
 
 Daemon::Daemon(int sockfd, sockaddr_in server_addr) {
     this->sockfd = sockfd;
     this->peer_id = 0; // assume we are the first node until told otherwise
+    this->key_counter = 0;
     peer_set = new Peer(server_addr, 0, 0);
     peer_set->next = peer_set;
     peer_set->previous = peer_set;
@@ -46,20 +48,32 @@ void Daemon::loop() {
 
     while(!terminated) {
         Daemon::Message *message = receive_message();
-        if(strcmp(message->command, ALL_KEYS) == 0) {
+        if(msg_command_is(message, ALL_KEYS)) {
             process_allkeys(message);
-        } else if (strcmp(message->command, ADD_KEY) == 0) {
-        } else if (strcmp(message->command, REQUEST_INFO) == 0) {
+        } else if (msg_command_is(message, ADD_KEY)) {
+        } else if (msg_command_is(message, REQUEST_INFO)) {
             process_request_info(message);
-        } else if (strcmp(message->command, NEW_PEER) == 0) {
+        } else if (msg_command_is(message, NEW_PEER)) {
             process_new_peer(message);
-        } else if (strcmp(message->command, REMOVE_PEER) == 0) {
+        } else if (msg_command_is(message, REMOVE_PEER)) {
             process_client_remove_peer(message);
-        } else if (strcmp(message->command, PEER_REMOVAL) == 0) {
+        } else if (msg_command_is(message, PEER_REMOVAL)) {
             process_peer_removal(message);
+        } else if (msg_command_is(message, C_ADD_CONTENT)) {
+            process_client_add_content(message);
+        } else if (msg_command_is(message, ADD_CONTENT)) {
+            process_add_content(message);
+        } else if (msg_command_is(message, TICK_FWD)) {
+            process_tick_fwd();
+        } else if (msg_command_is(message, TICK_BACK)) {
+            process_tick_back();
         }
         delete message;
     }
+}
+
+bool Daemon::msg_command_is(Message *msg, const char *command) {
+   return strcmp(msg->command, command) == 0;
 }
 
 void Daemon::print_peers() {
@@ -234,6 +248,24 @@ std::vector<Daemon::Message*> Daemon::wait_for_all(std::vector<int> fd_list) {
     }
 
     return msgs;
+}
+
+int Daemon::add_content_to_map(std::string content) {
+    int key = peer_id * 1000 + key_counter;
+    key_counter++;
+    key_map.insert(std::pair<int, std::string>(key, content));
+
+    return key;
+}
+
+Peer *Daemon::find_peer_by_id(int id) {
+    Peer *next = peer_set;
+    do {
+        if (next->id == id) return next;
+        next = next->next;
+
+    } while(next != peer_set);
+    return NULL;
 }
 
 /*
@@ -503,8 +535,24 @@ void Daemon::process_client_remove_peer(Message *message) {
     terminated = true;
 }
 
+void Daemon::process_add_content(Message *message) {
+    std::vector<std::string> body_items = tokenize(message->body, ";");
+    std::string content = body_items.at(0);
+    int source_id = atoi(content.c_str());
+    int key = add_content_to_map(body_items.at(0));
+    send_key_response(find_peer_by_id(source_id), key);
+}
+
+void Daemon::process_tick_fwd() {
+    peer_set = peer_set->next;
+}
+
+void Daemon::process_tick_back() {
+    peer_set = peer_set->previous;
+}
+
 void Daemon::broadcast_tick_fwd() {
-   close_all(broadcast(TICK_FWD, NULL, 0));
+    close_all(broadcast(TICK_FWD, NULL, 0));
 
 }
 
@@ -657,10 +705,40 @@ int Daemon::send_add_content(Peer *dest, const char* content) {
 
 /*
  * Message Purpose
+ *   response to an add_content request that sends the key back to the requester
+ *
+ * Message Body Format: key
+ *   key - int
+ *      the key of the newly-added content
+ */
+
+void Daemon::send_key_response(Peer *dest, int key) {
+    char *body = int_to_msg_body(key);
+
+    send_command(KEY_RESPONSE, body, strlen(body) + 1, &(dest->address));
+
+    delete[] body;
+}
+
+/*
+ * Message Purpose
  *   tells a peer that a requested key was not found (in reply to a get key request)
  *
  * This message has no body
  */
 void Daemon::send_no_key(Peer *dest) {
     send_command(NO_KEY, NULL, 0, &(dest->address));
+}
+
+void Daemon::process_client_add_content(Message *message) {
+    char *content = message->body;
+    int sockfd = send_add_content(peer_set, content);
+
+    Message *resp = receive_message(sockfd);
+
+    peer_set = peer_set->next;
+    broadcast_tick_fwd();
+
+    send_command(ACKNOWLEDGE, resp->body, resp->size, &(message->client));
+    delete resp;
 }

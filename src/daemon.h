@@ -2,6 +2,8 @@
 #define DAEMON_H
 
 #include <vector>
+#include <map>
+#include <string>
 #include <netinet/in.h>
 #include <unistd.h>
 
@@ -27,8 +29,10 @@ class Daemon {
 
     int sockfd;
     int peer_id;
+    int key_counter;
     Peer *peer_set;
     bool terminated;
+    std::map<int, std::string> key_map;
 
     // Methods that broadcast messages
     void broadcast_tick_fwd();
@@ -55,7 +59,7 @@ class Daemon {
     void process_new_peer(Message *message);
     void process_peer_data(Message *message);
     void process_content_response(Message *message);
-    void proccess_add_content(Message *message);
+    void process_add_content(Message *message);
     void process_key_response(Message *message);
     void process_no_key(Message *message);
     void process_allkeys(Message *message);
@@ -68,14 +72,17 @@ class Daemon {
 
     //utilites
     Peer *me();
+    bool msg_command_is(Message *msg, const char *command);
     int send_command(const char *cmd_id, const char *cmd_body, int body_len,
                      sockaddr_in *dest, int sock = -1);
     std::vector<int> broadcast(const char *cmd_id, const char *cmd_body, int body_len);
     Message *receive_message(int sock = -1);
     void close_all(std::vector<int> fd_list);
     std::vector<Message*> wait_for_all(std::vector<int> fd_list);
+    Peer *find_peer_by_id(int id);
     Peer *find_peer_by_addr(const char *addr, unsigned short sin_port);
     void wait_for_acks(std::vector<int> fd_list);
+    int add_content_to_map(std::string content);
 
     //debug
     void print_peers();

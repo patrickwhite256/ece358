@@ -84,6 +84,14 @@ char *Client::receive() {
         die_on_error();
     }
 
+    char cmd[8];
+    memcpy(cmd, initial_buffer, 7);
+    cmd[7] = '\0';
+
+    if(strcmp(cmd, FAIL) == 0) {
+        throw Exception(FAILED_REQUEST);
+    }
+
     // first 7 bytes reserved for command
     int msg_size = (initial_buffer[7] << 8) + initial_buffer[8];
     char *contents = new char[msg_size + 1];
