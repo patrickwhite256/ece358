@@ -190,7 +190,7 @@ Peer *Daemon::find_peer_by_addr(const char* addr, unsigned short sin_port) {
         if (sin_port == next->address.sin_port &&
             strcmp(addr, inet_ntoa(next->address.sin_addr)) == 0) {
 
-            match = next;
+            return match;
         }
 
         next = next->next;
