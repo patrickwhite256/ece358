@@ -1,5 +1,5 @@
 CXX=g++
-CXXFLAGS= -g -Wall
+CXXFLAGS= -g -Wall -DDEBUG
 EXECS=addpeer allkeys removepeer
 BIN_DIR=bin
 _EXECS=$(patsubst %,$(BIN_DIR)/%, $(EXECS))

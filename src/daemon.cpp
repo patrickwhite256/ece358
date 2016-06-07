@@ -63,6 +63,7 @@ void Daemon::loop() {
 }
 
 void Daemon::print_peers() {
+#ifdef DEBUG
     Peer *next = peer_set;
     do {
         std::cout << next->id << ") "
@@ -70,6 +71,7 @@ void Daemon::print_peers() {
                   << ntohs(next->address.sin_port) << std::endl;
         next = next->next;
     } while (next != peer_set);
+#endif
 }
 
 /*
@@ -84,8 +86,10 @@ Daemon::Message *Daemon::receive_message(int sock) {
     socklen_t alen = sizeof(sockaddr_in);
     if(sock == -1) {
         sock = accept(sockfd, (sockaddr *)&client, &alen);
+#ifdef DEBUG
         std::cout << "connection from " << inet_ntoa(client.sin_addr)
                   << ":" << ntohs(client.sin_port) << std::endl;
+#endif
         if(sock < 0) {
             die_on_error();
         }
@@ -98,7 +102,9 @@ Daemon::Message *Daemon::receive_message(int sock) {
     char *cmd = new char[8];
     memcpy(cmd, initial_buffer, 7);
     cmd[7] = '\0';
+#ifdef DEBUG
     std::cout << "received " << cmd << std::endl;
+#endif
 
     if(strcmp(cmd, ALL_KEYS) == 0) {
         char *dummy = new char[1];
@@ -169,7 +175,9 @@ int Daemon::send_command(const char *cmd_id, const char *cmd_body,
     if (body_len > 0) {
         strcpy(&msg[9], cmd_body);
     }
+#ifdef DEBUG
     std::cout << "sent " << cmd_id << std::endl;
+#endif
 
     ssize_t sentlen;
     if((sentlen = send(sock, msg, msglen, 0)) < 0 ) {
