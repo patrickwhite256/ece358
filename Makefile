@@ -5,9 +5,12 @@ BIN_DIR=bin
 _EXECS=$(patsubst %,$(BIN_DIR)/%, $(EXECS))
 _OBJECTS=$(patsubst src/%.cpp,build/%.o, $(wildcard src/*.cpp))
 
-.PHONY: all clean
+.PHONY: all clean test
 
 all: $(BIN_DIR) build $(_EXECS)
+
+test:
+	tests/run_tests.sh
 
 $(BIN_DIR):
 	mkdir -p $(BIN_DIR)
