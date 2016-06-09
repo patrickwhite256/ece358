@@ -5,7 +5,7 @@ set -e
 trap "rm -f out; kill_addpeer_procs" EXIT
 
 kill_addpeer_procs() {
-   ps aux | fgrep "bin/addpeer" | grep -v grep | awk '{print $2}' | xargs -r kill 
+   ps aux | fgrep "bin/addpeer" | grep -v grep | awk '{print $2}' | xargs -r kill
 }
 
 count_addpeer_procs(){
