@@ -2,8 +2,11 @@
 
 source tests/testbase.sh
 
+bin/addpeer > out
+addr=$(cat out)
+
 set +e
-output=$(bin/addpeer 127.0.0.1 1234 2>&1)
+output=$(bin/removepeer $addr 55 2>&1)
 res=$?
 set -e
 
