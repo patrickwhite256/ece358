@@ -52,10 +52,6 @@ int main(int argc, char **argv) {
         die_on_error();
     }
 
-    /* if(daemon(0, 1) < 0) { // fork process */
-    /*     die_on_error(); */
-    /* } */
-
     Daemon dmon(sockfd, server);
     if (argc > 1) { //connect to peer
         if (argc != 3) {
@@ -75,6 +71,12 @@ int main(int argc, char **argv) {
               << " "
               << ntohs(server.sin_port)
               << std::endl;
+
+#ifndef DEBUG
+    if(daemon(0, 1) < 0) { // fork process
+        die_on_error();
+    }
+#endif
 
     dmon.loop();
 }
