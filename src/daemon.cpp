@@ -535,6 +535,13 @@ void Daemon::process_client_remove_peer(Message *message) {
     terminated = true;
 }
 
+/*
+ * Message: ADD_CONTENT
+ * Format: content;sender_id
+ * Actions:
+ *        - add the given content to this peer's table with a new key
+ *        - return the new key back to the sender of the message
+ */
 void Daemon::process_add_content(Message *message) {
     std::vector<std::string> body_items = tokenize(message->body, ";");
     std::string content = body_items.at(0);
@@ -543,19 +550,74 @@ void Daemon::process_add_content(Message *message) {
     send_key_response(find_peer_by_id(source_id), key);
 }
 
+/*
+ * Message: TICK_FWD
+ * Format: None
+ * Actions:
+ *        - advance this peer's clock hand forward one link
+ */
 void Daemon::process_tick_fwd() {
     peer_set = peer_set->next;
 }
 
+/*
+ * Message: TICK_BACK
+ * Format: None
+ * Actions:
+ *        - move this peer's clock hand one link backward
+ */
 void Daemon::process_tick_back() {
     peer_set = peer_set->previous;
 }
 
+/*
+ * Message: C_ADD_CONTENT
+ * Format: content
+ * Actions:
+ *        - tell the peer being pointed to by the clock hand to add this content
+ *        - move this peer's clock hand forward and tell everyone else to do the same
+ *        - respond to the sender with the new key
+ */
+void Daemon::process_client_add_content(Message *message) {
+    char *content = message->body;
+    char *reply;
+
+    if (peer_set->id == peer_id) {
+        int key = add_content_to_map(content);
+        reply = int_to_msg_body(key);
+    } else {
+        send_add_content(peer_set, content);
+        Message *resp = receive_message();
+        reply = new char[strlen(resp->body) + 1];
+
+        strcpy(reply, resp->body);
+        delete resp;
+    }
+
+    peer_set = peer_set->next;
+    broadcast_tick_fwd();
+
+    send_command(ACKNOWLEDGE, reply, strlen(reply) + 1, NULL, message->connection);
+    delete reply;
+}
+
+/*
+ * Message Purpose
+ *   broadcasts a message indicating that all peers should move their clock hands forward
+ *
+ * This message has no body
+ */
 void Daemon::broadcast_tick_fwd() {
     close_all(broadcast(TICK_FWD, NULL, 0));
 
 }
 
+/*
+ * Message Purpose
+ *   broadcasts a message indicating that all peers should move their clock hands backward
+ *
+ * This message has no body
+ */
 void Daemon::broadcast_tick_back() {
     close_all(broadcast(TICK_BACK, NULL, 0));
 }
@@ -729,25 +791,4 @@ void Daemon::send_no_key(Peer *dest) {
     send_command(NO_KEY, NULL, 0, &(dest->address));
 }
 
-void Daemon::process_client_add_content(Message *message) {
-    char *content = message->body;
-    char *reply;
 
-    if (peer_set->id == peer_id) {
-        int key = add_content_to_map(content);
-        reply = int_to_msg_body(key);
-    } else {
-        send_add_content(peer_set, content);
-        Message *resp = receive_message();
-        reply = new char[strlen(resp->body) + 1];
-
-        strcpy(reply, resp->body);
-        delete resp;
-    }
-
-    peer_set = peer_set->next;
-    broadcast_tick_fwd();
-
-    send_command(ACKNOWLEDGE, reply, strlen(reply) + 1, NULL, message->connection);
-    delete reply;
-}
