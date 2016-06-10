@@ -3,7 +3,7 @@
 source tests/testbase.sh
 
 set +e
-output=$(bin/addpeer 127.0.0.1 1234 2>&1)
+output=$(bin/removepeer 127.0.0.1 1234 11 2>&1)
 res=$?
 set -e
 
