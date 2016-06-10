@@ -538,7 +538,7 @@ void Daemon::process_client_remove_peer(Message *message) {
 void Daemon::process_add_content(Message *message) {
     std::vector<std::string> body_items = tokenize(message->body, ";");
     std::string content = body_items.at(0);
-    int source_id = atoi(content.c_str());
+    int source_id = atoi(body_items.at(1).c_str());
     int key = add_content_to_map(body_items.at(0));
     send_key_response(find_peer_by_id(source_id), key);
 }
@@ -714,7 +714,6 @@ int Daemon::send_add_content(Peer *dest, const char* content) {
 
 void Daemon::send_key_response(Peer *dest, int key) {
     char *body = int_to_msg_body(key);
-
     send_command(KEY_RESPONSE, body, strlen(body) + 1, &(dest->address));
 
     delete[] body;
@@ -732,13 +731,23 @@ void Daemon::send_no_key(Peer *dest) {
 
 void Daemon::process_client_add_content(Message *message) {
     char *content = message->body;
-    int sockfd = send_add_content(peer_set, content);
+    char *reply;
 
-    Message *resp = receive_message(sockfd);
+    if (peer_set->id == peer_id) {
+        int key = add_content_to_map(content);
+        reply = int_to_msg_body(key);
+    } else {
+        send_add_content(peer_set, content);
+        Message *resp = receive_message();
+        reply = new char[strlen(resp->body) + 1];
+
+        strcpy(reply, resp->body);
+        delete resp;
+    }
 
     peer_set = peer_set->next;
     broadcast_tick_fwd();
 
-    send_command(ACKNOWLEDGE, resp->body, resp->size, &(message->client));
-    delete resp;
+    send_command(ACKNOWLEDGE, reply, strlen(reply) + 1, NULL, message->connection);
+    delete reply;
 }

@@ -16,17 +16,16 @@ int main(int argc, char**argv) {
         exit(-1);
     }
 
-    int content_len = strlen(argv[3] - 2);
-
-    char *content = new char[content_len + 1];
-    memcpy(content, &argv[3][1], content_len);
-    content[content_len] = '\0';
+    int content_len = strlen(argv[3]);
 
     try {
         Client client(argv[1], atoi(argv[2]));
-        client.send_command(C_ADD_CONTENT, content, content_len);
-        cout << client.receive() << endl;
+        client.send_command(C_ADD_CONTENT, argv[3], content_len);
+        char *resp = client.receive();
+        cout << resp << endl;
+        delete[] resp;
     } catch (Exception ex) {
-        cerr << "Error: no peers in network" << endl;
+        cerr << "Error: no such peer" << endl;
+        exit(-1);
     }
 }
