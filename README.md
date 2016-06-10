@@ -1,5 +1,7 @@
 # notmongo
 
+If this shit is green, we're probably done: ![build status](https://travis-ci.com/patrickwhite256/notmongo.svg?token=Urtvk4fuxUP8Zg5qkWzT&branch=master)
+
 
 - functional requirements
 
