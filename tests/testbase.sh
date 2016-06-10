@@ -31,7 +31,7 @@ validate_load_balancing() {
     total_keys=0
     total_peers=0
     counts=()
-    for addr in $ADDRS; do
+    for addr in ${ADDRS[@]}; do
         keylist=$(bin/allkeys $addr)
         count=fgrep -o "," <<< keylist | wc -l
         $counts[$total_peers]=$count
@@ -41,7 +41,7 @@ validate_load_balancing() {
     upper=$(python -c "import math;print int(math.ceil($total_keys / float($total_peers)))")
     lower=$(python -c "import math;print int(math.floor($total_keys / float($total_peers)))")
     [[ $keys == $1 ]]
-    for count in $counts; do
+    for count in ${counts[@]}; do
         [ $count -le $upper ]
         [ $count -ge $lower ]
     done

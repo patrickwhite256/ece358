@@ -43,9 +43,9 @@ if [[ $failed == 0 ]]; then
 else
     echo -e "\e[0;31m($failed FAILED)\e[0m"
     echo "Failed cases:"
-    for failed in $failed_names
+    for failed in ${failed_names[@]}
     do
         echo "- $failed"
     done
+    exit 1
 fi
-
