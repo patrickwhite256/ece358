@@ -4,14 +4,15 @@
 #include <exception>
 #include <string>
 
-#define BAD_ADDRESS 1
-#define PROTOCOL_VIOLATION 2
+#define BAD_ADDRESS             1
+#define PROTOCOL_VIOLATION      2
+#define FAILED_REQUEST          3
 
 class Exception: public std::exception {
     int _err_code;
 
   public:
-    explicit Exception(int err_code) : _err_code(err_code) {}
+    explicit Exception(int err_code = 0) : _err_code(err_code) {}
     virtual ~Exception() throw() {}
 
     virtual const char* what() const throw () {
