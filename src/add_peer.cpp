@@ -61,7 +61,6 @@ int main(int argc, char **argv) {
         try {
             dmon.connect(argv[1], htons(atoi(argv[2])));
         } catch (Exception ex) {
-            std::cerr << ex.what() << std::endl;
             std::cerr << "Error: no such peer" << std::endl;
             exit(-1);
         }

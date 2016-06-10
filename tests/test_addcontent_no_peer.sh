@@ -8,4 +8,4 @@ res=$?
 set -e
 
 [[ $res != 0 ]]
-[[ $output =~ "^Error" ]]
+[[ $output =~ ^Error ]]
