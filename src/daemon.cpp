@@ -88,6 +88,15 @@ void Daemon::print_peers() {
 #endif
 }
 
+void Daemon::print_table() {
+#ifdef DEBUG
+    std::cout << "Table contents:" << std::endl;
+    for (std::map<int, std::string>::iterator it = key_map.begin(); it != key_map.end(); ++it) {
+        std::cout << it->first << ": " << it->second << std::endl;
+    }
+#endif
+}
+
 /*
  * receive_message
  *   receives a message and returns it as a Message
@@ -548,6 +557,8 @@ void Daemon::process_add_content(Message *message) {
     int source_id = atoi(body_items.at(1).c_str());
     int key = add_content_to_map(body_items.at(0));
     send_key_response(find_peer_by_id(source_id), key);
+
+    print_table();
 }
 
 /*
@@ -585,6 +596,7 @@ void Daemon::process_client_add_content(Message *message) {
     if (peer_set->id == peer_id) {
         int key = add_content_to_map(content);
         reply = int_to_msg_body(key);
+        print_table();
     } else {
         send_add_content(peer_set, content);
         Message *resp = receive_message();

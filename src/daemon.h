@@ -86,6 +86,7 @@ class Daemon {
 
     //debug
     void print_peers();
+    void print_table();
 
   public:
     Daemon(int sockfd, sockaddr_in server_addr);
