@@ -67,6 +67,8 @@ void Daemon::loop() {
             process_tick_fwd();
         } else if (msg_command_is(message, TICK_BACK)) {
             process_tick_back();
+        } else if (msg_command_is(message, UPDATE_TOTALS)) {
+            process_update_totals(message);
         }
         delete message;
     }
@@ -82,7 +84,8 @@ void Daemon::print_peers() {
     do {
         std::cout << next->id << ") "
                   << inet_ntoa(next->address.sin_addr) << ":"
-                  << ntohs(next->address.sin_port) << std::endl;
+                  << ntohs(next->address.sin_port)
+                  << " Key Count: " << next->key_count << std::endl;
         next = next->next;
     } while (next != peer_set);
 #endif
@@ -263,6 +266,7 @@ int Daemon::add_content_to_map(std::string content) {
     int key = peer_id * 1000 + key_counter;
     key_counter++;
     key_map.insert(std::pair<int, std::string>(key, content));
+    me()->key_count = key_map.size();
 
     return key;
 }
@@ -475,7 +479,7 @@ void Daemon::process_peer_data(Message *message) {
         peer_addr.sin_addr = addr;
         peer_addr.sin_port = atoi(tokens[i + 3].c_str());
         Peer *new_peer = new Peer(peer_addr,
-                                  atoi(tokens[i + 2].c_str()),
+                                  atoi(tokens[i + 1].c_str()),
                                   atoi(tokens[i].c_str()));
         peer_set->next = new_peer;
         new_peer->previous = peer_set;
@@ -556,8 +560,24 @@ void Daemon::process_add_content(Message *message) {
     std::string content = body_items.at(0);
     int key = add_content_to_map(body_items.at(0));
     send_key_response(message->connection, key);
+    broadcast_update_totals(key_map.size());
 
     print_table();
+}
+
+/*
+ * Message: UPDATE_TOTALS
+ * Format: new_total;source
+ * Actions:
+ *        - update the peer with id source to have the total new_total
+ */
+void Daemon::process_update_totals(Message * message) {
+    std::vector<std::string>  body_items = tokenize(message->body, ";");
+    int new_total = atoi(body_items.at(0).c_str());
+    int source_id = atoi(body_items.at(1).c_str());
+
+    Peer *updated = find_peer_by_id(source_id);
+    updated->key_count = new_total;
 }
 
 /*
@@ -594,6 +614,7 @@ void Daemon::process_client_add_content(Message *message) {
 
     if (peer_set->id == peer_id) {
         int key = add_content_to_map(content);
+        broadcast_update_totals(key_map.size());
         reply = int_to_msg_body(key);
         print_table();
     } else {
@@ -644,7 +665,7 @@ void Daemon::broadcast_tick_back() {
  *      the id of the peer broadcasting the message
  *
  */
-void Daemon::broadcast_update_total(int total) {
+void Daemon::broadcast_update_totals(int total) {
     char *new_total = int_to_msg_body(total);
     char *source = int_to_msg_body(peer_id);
     char *body = new char[strlen(new_total) + strlen(source) + 2];
