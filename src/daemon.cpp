@@ -554,9 +554,8 @@ void Daemon::process_client_remove_peer(Message *message) {
 void Daemon::process_add_content(Message *message) {
     std::vector<std::string> body_items = tokenize(message->body, ";");
     std::string content = body_items.at(0);
-    int source_id = atoi(body_items.at(1).c_str());
     int key = add_content_to_map(body_items.at(0));
-    send_key_response(find_peer_by_id(source_id), key);
+    send_key_response(message->connection, key);
 
     print_table();
 }
@@ -598,8 +597,8 @@ void Daemon::process_client_add_content(Message *message) {
         reply = int_to_msg_body(key);
         print_table();
     } else {
-        send_add_content(peer_set, content);
-        Message *resp = receive_message();
+        int sockfd = send_add_content(peer_set, content);
+        Message *resp = receive_message(sockfd);
         reply = new char[strlen(resp->body) + 1];
 
         strcpy(reply, resp->body);
@@ -740,11 +739,11 @@ int Daemon::send_add_key(Peer *dest, int key, const char *val) {
  *      the string we want to send
  */
 
-void Daemon::send_content_response(Peer *dest, const char* content) {
+void Daemon::send_content_response(int sockfd, const char* content) {
     char *body = new char[strlen(content) + 1];
     strcpy(body, content);
 
-    send_command(CONTENT_RESPONSE, body, strlen(body) + 1, &(dest->address));
+    send_command(CONTENT_RESPONSE, body, strlen(body) + 1, NULL, sockfd);
 
     delete[] body;
 }
@@ -786,9 +785,9 @@ int Daemon::send_add_content(Peer *dest, const char* content) {
  *      the key of the newly-added content
  */
 
-void Daemon::send_key_response(Peer *dest, int key) {
+void Daemon::send_key_response(int sockfd, int key) {
     char *body = int_to_msg_body(key);
-    send_command(KEY_RESPONSE, body, strlen(body) + 1, &(dest->address));
+    send_command(KEY_RESPONSE, body, strlen(body) + 1, NULL, sockfd);
 
     delete[] body;
 }
@@ -799,8 +798,8 @@ void Daemon::send_key_response(Peer *dest, int key) {
  *
  * This message has no body
  */
-void Daemon::send_no_key(Peer *dest) {
-    send_command(NO_KEY, NULL, 0, &(dest->address));
+void Daemon::send_no_key(int sockfd) {
+    send_command(NO_KEY, NULL, 0, NULL, sockfd);
 }
 
 
