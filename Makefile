@@ -1,7 +1,7 @@
 CXX=g++
 DEBUG ?= -DDEBUG
 CXXFLAGS= -g -Wall $(DEBUG)
-EXECS=addpeer allkeys removepeer addcontent
+EXECS=addpeer allkeys removepeer addcontent lookupcontent
 BIN_DIR=bin
 _EXECS=$(patsubst %,$(BIN_DIR)/%, $(EXECS))
 _OBJECTS=$(patsubst src/%.cpp,build/%.o, $(wildcard src/*.cpp))
@@ -39,4 +39,7 @@ $(BIN_DIR)/removepeer: build/remove_peer.o build/util.o build/client.o build/mes
 	$(CXX) $(CXXFLAGS) $^ -o $@
 
 $(BIN_DIR)/addcontent: build/add_content.o build/util.o build/client.o build/messages.o
+	$(CXX) $(CXXFLAGS) $^ -o $@
+
+$(BIN_DIR)/lookupcontent: build/lookup_content.o build/util.o build/client.o build/messages.o
 	$(CXX) $(CXXFLAGS) $^ -o $@
