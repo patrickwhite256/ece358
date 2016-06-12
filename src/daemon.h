@@ -37,7 +37,7 @@ class Daemon {
     // Methods that broadcast messages
     void broadcast_tick_fwd();
     void broadcast_tick_back();
-    void broadcast_update_total(int total);
+    void broadcast_update_totals();
     std::vector<int> broadcast_remove_key(int key);
     std::vector<int> broadcast_get_key(int key);
     int send_add_key(Peer *dest, int key, const char *val);
@@ -56,7 +56,7 @@ class Daemon {
     void process_get_key(Message *message);
     void process_add_peer(Message *message);
     void process_peer_removal(Message *message);
-    void process_update_total(Message *message);
+    void process_update_totals(Message *message);
     void process_request_info(Message *message);
     void process_new_peer(Message *message);
     void process_peer_data(Message *message);
