@@ -41,10 +41,12 @@ class Daemon {
     std::vector<int> broadcast_remove_key(int key);
     std::vector<int> broadcast_get_key(int key);
     int send_add_key(Peer *dest, int key, const char *val);
-    void send_content_response(Peer *dest, const char* content);
     int send_add_content(Peer *dest, const char* content);
-    void send_key_response(Peer *dest, int key);
-    void send_no_key(Peer *dest);
+
+    // Methods that send messages as replies to others using a connection sockfd
+    void send_content_response(int sockfd, const char* content);
+    void send_key_response(int sockfd, int key);
+    void send_no_key(int sockfd);
 
     // Methods that process messages
     void process_tick_fwd();
