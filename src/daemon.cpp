@@ -560,7 +560,7 @@ void Daemon::process_add_content(Message *message) {
     std::string content = body_items.at(0);
     int key = add_content_to_map(body_items.at(0));
     send_key_response(message->connection, key);
-    broadcast_update_totals(key_map.size());
+    broadcast_update_totals();
 
     print_table();
 }
@@ -614,7 +614,7 @@ void Daemon::process_client_add_content(Message *message) {
 
     if (peer_set->id == peer_id) {
         int key = add_content_to_map(content);
-        broadcast_update_totals(key_map.size());
+        broadcast_update_totals();
         reply = int_to_msg_body(key);
         print_table();
     } else {
@@ -665,8 +665,8 @@ void Daemon::broadcast_tick_back() {
  *      the id of the peer broadcasting the message
  *
  */
-void Daemon::broadcast_update_totals(int total) {
-    char *new_total = int_to_msg_body(total);
+void Daemon::broadcast_update_totals() {
+    char *new_total = int_to_msg_body(key_map.size());
     char *source = int_to_msg_body(peer_id);
     char *body = new char[strlen(new_total) + strlen(source) + 2];
     strcpy(body, new_total);

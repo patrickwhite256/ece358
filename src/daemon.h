@@ -37,7 +37,7 @@ class Daemon {
     // Methods that broadcast messages
     void broadcast_tick_fwd();
     void broadcast_tick_back();
-    void broadcast_update_totals(int total);
+    void broadcast_update_totals();
     std::vector<int> broadcast_remove_key(int key);
     std::vector<int> broadcast_get_key(int key);
     int send_add_key(Peer *dest, int key, const char *val);
