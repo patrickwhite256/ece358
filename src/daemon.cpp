@@ -69,6 +69,10 @@ void Daemon::loop() {
             process_tick_back();
         } else if (msg_command_is(message, UPDATE_TOTALS)) {
             process_update_totals(message);
+        } else if (msg_command_is(message, C_LOOKUP_CONTENT)) {
+            process_client_lookup_content(message);
+        } else if (msg_command_is(message, GET_KEY)) {
+            process_get_key(message);
         }
         delete message;
     }
@@ -601,6 +605,24 @@ void Daemon::process_tick_back() {
 }
 
 /*
+ * Message: GET_KEY
+ * Format: key
+ * Actions:
+ *        - check if this peer has the requested key, send a CONTENT_RESPONSE if it does
+ *        - else send a NO_KEY response
+ */
+void Daemon::process_get_key(Message *message) {
+    int lookup_key = atoi(message->body);
+    std::map<int, std::string>::iterator result = key_map.find(lookup_key);
+
+    if (result != key_map.end()) {
+        send_content_response(message->connection, result->second.c_str());
+    } else {
+        send_no_key_response(message->connection);
+    }
+}
+
+/*
  * Message: C_ADD_CONTENT
  * Format: content
  * Actions:
@@ -631,6 +653,42 @@ void Daemon::process_client_add_content(Message *message) {
 
     send_command(ACKNOWLEDGE, reply, strlen(reply) + 1, NULL, message->connection);
     delete reply;
+}
+
+/*
+ * Message: C_LOOKUP_CONTENT
+ * Format: key
+ * Actions:
+ *        - check if this peer has the content with the requested key. if it does, return it
+ *        - else broadcast a GET_KEY message looking for the content, gather responses
+ *        - if any of the responses is a CONTENT_RESPONSE, respond to the client with the content found
+ *        - otherwise respond with a FAIL response
+ */
+void Daemon::process_client_lookup_content(Message *message) {
+    int lookup_key = atoi(message->body);
+    std::map<int, std::string>::iterator result = key_map.find(lookup_key);
+
+    if (result != key_map.end()) {
+        send_content_response(message->connection, result->second.c_str());
+    } else {
+        std::vector<int> sockfds = broadcast_get_key(lookup_key);
+        std::vector<Message*> replies = wait_for_all(sockfds);
+        bool found = false;
+
+        for (unsigned int i = 0; i < replies.size(); ++i) {
+            Message *reply = replies.at(i);
+            if (msg_command_is(reply, CONTENT_RESPONSE)) {
+                found = true;
+                send_content_response(message->connection, reply->body);
+            }
+
+            delete reply;
+        }
+
+        if (!found) {
+            send_fail_response(message->connection);
+        }
+    }
 }
 
 /*
@@ -819,8 +877,18 @@ void Daemon::send_key_response(int sockfd, int key) {
  *
  * This message has no body
  */
-void Daemon::send_no_key(int sockfd) {
+void Daemon::send_no_key_response(int sockfd) {
     send_command(NO_KEY, NULL, 0, NULL, sockfd);
+}
+
+/*
+ * Message Purpose
+ *   tells the client that a request has failed
+ *
+ * This message has no body
+ */
+void Daemon::send_fail_response(int sockfd) {
+    send_command(FAIL, NULL, 0, NULL, sockfd);
 }
 
 

@@ -46,7 +46,8 @@ class Daemon {
     // Methods that send messages as replies to others using a connection sockfd
     void send_content_response(int sockfd, const char* content);
     void send_key_response(int sockfd, int key);
-    void send_no_key(int sockfd);
+    void send_no_key_response(int sockfd);
+    void send_fail_response(int sockfd);
 
     // Methods that process messages
     void process_tick_fwd();
