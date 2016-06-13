@@ -12,21 +12,20 @@ using namespace std;
 
 int main(int argc, char **argv) {
     if (argc != 4) {
-        cerr << "Usage: lookupcontent ip-address port key" << endl;
+        cerr << "Usage: removecontent ip-address port key" << endl;
         exit(-1);
     }
 
-    int content_length = strlen(argv[3]);
+    int content_len = strlen(argv[3]);
 
     try {
         Client client(argv[1], atoi(argv[2]));
-        client.send_command(C_LOOKUP_CONTENT, argv[3], content_length);
-        char *resp = client.receive();
-        cout << resp << endl;
-        delete[] resp;
+        client.send_command(C_REMOVE_CONTENT, argv[3], content_len);
+        client.wait_for_ack();
     } catch (Exception ex) {
+
         if (ex.err_code() == BAD_ADDRESS) {
-            cerr << "Error: no such peer" << std::endl;
+            cerr << "Error: no such peer" << endl;
         } else {
             cerr << "Error: no such content" << endl;
         }

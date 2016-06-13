@@ -37,21 +37,24 @@ class Daemon {
     // Methods that broadcast messages
     void broadcast_tick_fwd();
     void broadcast_tick_back();
-    void broadcast_update_totals();
+    void broadcast_update_totals(int total = -1, int id = -1);
     std::vector<int> broadcast_remove_key(int key);
     std::vector<int> broadcast_get_key(int key);
     int send_add_key(Peer *dest, int key, const char *val);
     int send_add_content(Peer *dest, const char* content);
+    int send_steal_key(Peer *dest);
 
     // Methods that send messages as replies to others using a connection sockfd
     void send_content_response(int sockfd, const char* content);
     void send_key_response(int sockfd, int key);
     void send_no_key_response(int sockfd);
     void send_fail_response(int sockfd);
+    void send_remove_key_response(int sockfd, int will_rebalance);
+    void send_steal_response(int sockfd, int key, const char *content);
 
     // Methods that process messages
-    void process_tick_fwd();
-    void process_tick_back();
+    void process_tick_fwd(Message *message);
+    void process_tick_back(Message *message);
     void process_add_key(Message *message);
     void process_remove_key(Message *message);
     void process_get_key(Message *message);
@@ -66,6 +69,8 @@ class Daemon {
     void process_key_response(Message *message);
     void process_no_key(Message *message);
     void process_allkeys(Message *message);
+    void process_steal_key(Message *message);
+    void process_steal_response(Message *message);
 
     // Methods that process messages from the client
     void process_client_remove_peer(Message *message);
@@ -84,8 +89,13 @@ class Daemon {
     std::vector<Message*> wait_for_all(std::vector<int> fd_list);
     Peer *find_peer_by_id(int id);
     Peer *find_peer_by_addr(const char *addr, unsigned short sin_port);
+    void wait_for_ack(int sockfd);
     void wait_for_acks(std::vector<int> fd_list);
     int add_content_to_map(std::string content);
+    void add_key_to_map(int key, std::string content);
+    bool remove_key_from_map(int key);
+    void resolve_remove_protocol(Message *remove_reply);
+    bool will_rebalance();
 
     //debug
     void print_peers();

@@ -6,11 +6,11 @@
 struct Peer {
     Peer *next;
     Peer *previous;
-    int key_count;
+    unsigned int key_count;
     int id;
     sockaddr_in address;
 
-    Peer(sockaddr_in address, int key_count, int id);
+    Peer(sockaddr_in address, unsigned int key_count, int id);
 };
 
 #endif

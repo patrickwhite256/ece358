@@ -6,10 +6,10 @@ bin/addpeer > out
 addr=$(cat out)
 
 key=$(bin/addcontent $addr "content")
-bin/removepeer $addr $key
+bin/removecontent $addr $key
 
 set +e
-output=$(bin/removepeer $addr $key 2>&1)
+output=$(bin/removecontent $addr $key 2>&1)
 res=$?
 set -e
 
