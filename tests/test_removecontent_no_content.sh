@@ -6,7 +6,7 @@ bin/addpeer > out
 addr=$(cat out)
 
 set +e
-output=$(bin/removepeer $addr 55 2>&1)
+output=$(bin/removecontent $addr 55 2>&1)
 res=$?
 set -e
 

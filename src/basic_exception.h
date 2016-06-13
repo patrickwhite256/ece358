@@ -30,6 +30,8 @@ class Exception: public std::exception {
 
         return msg.c_str();
     }
+
+    int err_code() { return _err_code; }
 };
 
 #endif

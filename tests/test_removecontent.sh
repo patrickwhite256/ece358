@@ -6,4 +6,4 @@ bin/addpeer > out
 addr=$(cat out)
 
 key=$(bin/addcontent $addr "content")
-bin/removepeer $addr $key
+bin/removecontent $addr $key

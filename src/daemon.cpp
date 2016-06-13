@@ -24,12 +24,15 @@ const char *REMOVE_KEY       = "remvkey";
 const char *GET_KEY          = "getakey";
 const char *ADD_CONTENT      = "addcont";
 const char *PEER_REMOVAL     = "iamdead";
+const char *STEAL_KEY        = "giffkey";
 
 // messages that are part of protocols
 const char *PEER_DATA        = "peerdta";
 const char *CONTENT_RESPONSE = "content";
 const char *NO_KEY           = "nokey4u";
 const char *KEY_RESPONSE     = "keyresp";
+const char *REMOVE_RESPONSE  = "dropkey";
+const char *STEAL_RESPONSE   = "hereugo";
 
 Daemon::Daemon(int sockfd, sockaddr_in server_addr) {
     this->sockfd = sockfd;
@@ -64,16 +67,23 @@ void Daemon::loop() {
         } else if (msg_command_is(message, ADD_CONTENT)) {
             process_add_content(message);
         } else if (msg_command_is(message, TICK_FWD)) {
-            process_tick_fwd();
+            process_tick_fwd(message);
         } else if (msg_command_is(message, TICK_BACK)) {
-            process_tick_back();
+            process_tick_back(message);
         } else if (msg_command_is(message, UPDATE_TOTALS)) {
             process_update_totals(message);
         } else if (msg_command_is(message, C_LOOKUP_CONTENT)) {
             process_client_lookup_content(message);
         } else if (msg_command_is(message, GET_KEY)) {
             process_get_key(message);
+        } else if (msg_command_is(message, STEAL_KEY)) {
+            process_steal_key(message);
+        } else if (msg_command_is(message, REMOVE_KEY)) {
+            process_remove_key(message);
+        } else if (msg_command_is(message, C_REMOVE_CONTENT)) {
+            process_client_remove_content(message);
         }
+
         delete message;
     }
 }
@@ -266,6 +276,13 @@ std::vector<Daemon::Message*> Daemon::wait_for_all(std::vector<int> fd_list) {
     return msgs;
 }
 
+/*
+ * add_content_to_map
+ *   adds a piece of content to this peer's map and assigns it a new key
+ *   @param content - the string of content to be added to the map
+ *   @return key - the key of the newly-added content
+ */
+
 int Daemon::add_content_to_map(std::string content) {
     int key = peer_id * 1000 + key_counter;
     key_counter++;
@@ -275,6 +292,123 @@ int Daemon::add_content_to_map(std::string content) {
     return key;
 }
 
+/*
+ * remove_key_from_map
+ * Removes a key from this peer, then checks that the network is still balanced
+ * If not, this peer will take a key from the peer in the network that last received
+ * a piece of content (the peer that is previous to the current clock hand).
+ *
+ * Note: To keep things synchronous, this peer must broadcast the UPDATE_TOTALS message
+ *       on behalf of the peer that it stole a key from. The UPDATE_TOTALS message signals
+ *       to the original recipient of the request that it can send an ACKNOWLEDGE back to the
+ *       client, which we don't want to do until the the new key distribution has been settled
+ *
+ * @param key - the key to be removed
+ * @return did_rebalance - true if the operation caused a rebalance, false otherwise
+ */
+bool Daemon::remove_key_from_map(int key) {
+    key_map.erase(key);
+    Peer *next = peer_set;
+    bool rebalance = false;
+    do {
+        if (next->key_count - key_map.size() > 1) {
+            rebalance = true;
+            break;
+        }
+
+        next = next->next;
+    } while (next != peer_set);
+
+    if (rebalance) {
+        peer_set = peer_set->previous;
+        broadcast_tick_back();
+
+        int sockfd = send_steal_key(peer_set);
+        Message *resp = receive_message(sockfd);
+        process_steal_response(resp);
+        int new_size = key_map.size() - 1;
+        peer_set->key_count = new_size;
+        broadcast_update_totals(new_size, peer_set->id);
+        delete resp;
+    } else {
+        broadcast_update_totals();
+    }
+
+    return rebalance;
+}
+
+/*
+ * resolve_remove_protocol
+ *   carries out a bit of back and forth communication with the sender of the `remove_reply` message
+ *   that ensures that the table's state has fully stabilized before returning
+ *   Process:
+ *      - if the removal is going to result in a rebalance, wait for someone
+ *        to tell us to tick the clock back
+ *          - if after the clock ticks back it is now pointing to this peer, we also have to
+ *            expect a STEAL_KEY message
+ *      - next, wait for someone to tell us to update the totals of the peer that wound up
+ *        losing a key
+ *      - finally, wait for an acknowledgement that every peer has finished updating
+ *
+ * @param remove_reply - the message that indicated that this peer will be removing a key
+ */
+
+void Daemon::resolve_remove_protocol(Message *remove_reply) {
+    bool did_rebalance = (bool)atoi(remove_reply->body);
+
+    if (did_rebalance) {
+        Message *tick = receive_message();
+        if (!msg_command_is(tick, TICK_BACK)) {
+            throw Exception(PROTOCOL_VIOLATION);
+        }
+        process_tick_back(tick);
+        delete tick;
+
+        if (peer_set == me()) {
+            Message *steal = receive_message();
+            if (!msg_command_is(steal, STEAL_KEY)) {
+                throw Exception(PROTOCOL_VIOLATION);
+            }
+            process_steal_key(steal);
+            delete steal;
+        }
+    }
+
+    Message *update = receive_message();
+    if (!msg_command_is(update, UPDATE_TOTALS)) {
+        throw Exception(PROTOCOL_VIOLATION);
+    }
+    process_update_totals(update);
+    delete update;
+
+    wait_for_ack(remove_reply->connection);
+}
+
+/*
+ * will_rebalance
+ *
+ * @return true if removing a key from this peer will require a rebalance, false otherwise
+ */
+bool Daemon::will_rebalance() {
+    Peer *next = peer_set;
+
+    do {
+        if (next->key_count > key_map.size()) {
+            return true;
+        }
+
+        next = next->next;
+    } while (next != peer_set);
+
+    return false;
+}
+
+/*
+ * find_peer_by_id
+ *    find a peer in the network by id
+ *    @param id - the integer id of the desired peer
+ *    @return matching peer or null
+ */
 Peer *Daemon::find_peer_by_id(int id) {
     Peer *next = peer_set;
     do {
@@ -309,6 +443,18 @@ Peer *Daemon::find_peer_by_addr(const char* addr, unsigned short sin_port) {
 }
 
 /*
+ * wait_for_ack
+ *   wait for an acknowledgement, then close the socket
+ *   @param sockfd - the file descriptor of the socket to wait on
+ */
+void Daemon::wait_for_ack(int sockfd) {
+    Message *ack = receive_message(sockfd);
+    if (!msg_command_is(ack, ACKNOWLEDGE)) throw Exception(PROTOCOL_VIOLATION);
+    delete ack;
+    close(sockfd);
+}
+
+/*
  * wait_for_acks
  *   wait for each remote client to acknowledge a message, then close the socket.
  *   @param fd_list a list of socket file descriptors to listen on
@@ -319,6 +465,7 @@ void Daemon::wait_for_acks(std::vector<int> fd_list) {
         if (strcmp(msgs[i]->command, ACKNOWLEDGE) != 0) throw Exception(PROTOCOL_VIOLATION);
         delete msgs[i];
     }
+    close_all(fd_list);
 }
 
 /*
@@ -575,13 +722,14 @@ void Daemon::process_add_content(Message *message) {
  * Actions:
  *        - update the peer with id source to have the total new_total
  */
-void Daemon::process_update_totals(Message * message) {
+void Daemon::process_update_totals(Message *message) {
     std::vector<std::string>  body_items = tokenize(message->body, ";");
     int new_total = atoi(body_items.at(0).c_str());
     int source_id = atoi(body_items.at(1).c_str());
 
     Peer *updated = find_peer_by_id(source_id);
     updated->key_count = new_total;
+    send_command(ACKNOWLEDGE, NULL, 0, NULL, message->connection);
 }
 
 /*
@@ -590,8 +738,9 @@ void Daemon::process_update_totals(Message * message) {
  * Actions:
  *        - advance this peer's clock hand forward one link
  */
-void Daemon::process_tick_fwd() {
+void Daemon::process_tick_fwd(Message *message) {
     peer_set = peer_set->next;
+    send_command(ACKNOWLEDGE, NULL, 0 , NULL, message->connection);
 }
 
 /*
@@ -600,8 +749,9 @@ void Daemon::process_tick_fwd() {
  * Actions:
  *        - move this peer's clock hand one link backward
  */
-void Daemon::process_tick_back() {
+void Daemon::process_tick_back(Message *message) {
     peer_set = peer_set->previous;
+    send_command(ACKNOWLEDGE, NULL, 0, NULL, message->connection);
 }
 
 /*
@@ -620,6 +770,66 @@ void Daemon::process_get_key(Message *message) {
     } else {
         send_no_key_response(message->connection);
     }
+}
+
+/*
+ * Message: REMOVE_KEY
+ * Format: key
+ * Actions:
+ *        - First, determine if this peer has the key. Reply with NO_KEY if it doesn't
+ *        - If we do have the key, check if removing it will cause a rebalance, and
+ *          respond with the answer
+ *        - invoke remove_key_from_map, which will remove the desired key and
+ *          perform any rebalancing required
+ *        - send a final ACKNOWLEDGE to the requester, indicating that we are finished with
+ *          the operation
+ */
+void Daemon::process_remove_key(Message *message) {
+    int remove_key = atoi(message->body);
+    std::map<int, std::string>::iterator result = key_map.find(remove_key);
+
+    if (result != key_map.end()) {
+        send_remove_key_response(message->connection, (int)will_rebalance());
+        remove_key_from_map(remove_key);
+        send_command(ACKNOWLEDGE, NULL, 0, NULL, message->connection);
+    } else {
+        send_no_key_response(message->connection);
+    };
+
+    print_table();
+}
+
+/*
+ * Message: STEAL_KEY
+ * Format: None
+ * Actions:
+ *        - remove an arbitrary key-value pair from this table and send it back as a response
+ *
+ *  Note: it is the responsibility of the requester to update the totals after adds the stolen
+ *        key to its own table
+ */
+void Daemon::process_steal_key(Message *message) {
+    std::map<int, std::string>::iterator first_pair = key_map.begin();
+    int key = first_pair->first;
+    std::string content = first_pair->second;
+    key_map.erase(first_pair);
+    send_steal_response(message->connection, key, content.c_str());
+
+    print_table();
+}
+
+/*
+ * Message: STEAL_RESPONSE
+ * Format: key;content
+ * Actions:
+ *        - add the key-value pair that was given to us in the response to this peer's table
+ */
+void Daemon::process_steal_response(Message *message) {
+    std::vector<std::string> body_items = tokenize(message->body, ";");
+    int key = atoi(body_items.at(0).c_str());
+    std::string content = body_items.at(1);
+
+    key_map.insert(std::pair<int, std::string>(key, content));
 }
 
 /*
@@ -675,7 +885,7 @@ void Daemon::process_client_lookup_content(Message *message) {
         std::vector<Message*> replies = wait_for_all(sockfds);
         bool found = false;
 
-        for (unsigned int i = 0; i < replies.size(); ++i) {
+        for (size_t i = 0; i < replies.size(); ++i) {
             Message *reply = replies.at(i);
             if (msg_command_is(reply, CONTENT_RESPONSE)) {
                 found = true;
@@ -692,6 +902,49 @@ void Daemon::process_client_lookup_content(Message *message) {
 }
 
 /*
+ * Message: C_REMOVE_CONTENT
+ * Format: key
+ * Actions:
+ *        - look for the requested content in the current peer. if found, remove it and update totals
+ *          - if removed and the current peer now has too few keys, tick the clock backward and then take a
+ *            key from that peer. Then wait to receive a UPDATE_TOTALS message before sending
+ *            an ACKNOWLEDGE to the client
+ *        - else broadcast a REMOVE_KEY message to the network, and collect responses
+ *          - return a FAIL message to the client if all responses are NO_KEY
+ *          - if there exists another peer with the requested key, resolve the removal protocol
+ */
+void Daemon::process_client_remove_content(Message *message) {
+    int remove_key = atoi(message->body);
+    std::map<int, std::string>::iterator result = key_map.find(remove_key);
+
+    if (result != key_map.end()) {
+        remove_key_from_map(remove_key);
+    } else {
+        std::vector<int> sockfds = broadcast_remove_key(remove_key);
+        std::vector<Message*> replies = wait_for_all(sockfds);
+        bool found = false;
+
+        for (size_t i = 0; i < replies.size(); ++i) {
+            Message *reply = replies.at(i);
+
+            if (!msg_command_is(reply, NO_KEY)) {
+                found = true;
+                resolve_remove_protocol(reply);
+            }
+
+            delete reply;
+        }
+
+        if (!found) {
+           send_fail_response(message->connection);
+           return;
+        }
+    }
+
+    send_command(ACKNOWLEDGE, NULL, 0, NULL, message->connection);
+}
+
+/*
  * Message Purpose
  *   broadcasts a message indicating that all peers should move their clock hands forward
  *
@@ -699,7 +952,6 @@ void Daemon::process_client_lookup_content(Message *message) {
  */
 void Daemon::broadcast_tick_fwd() {
     close_all(broadcast(TICK_FWD, NULL, 0));
-
 }
 
 /*
@@ -709,31 +961,42 @@ void Daemon::broadcast_tick_fwd() {
  * This message has no body
  */
 void Daemon::broadcast_tick_back() {
-    close_all(broadcast(TICK_BACK, NULL, 0));
+    wait_for_acks(broadcast(TICK_BACK, NULL, 0));
 }
 
 /*
  * Message Purpose
  *   broadcasts a message indicating that this peer has updated the number of keys it holds
+ *   will wait for acknowledgement from the network before continuing
  *
- * Message Body Format: new_total;source
+ * Message Body Format: new_total;id
  *   new_total - integer
  *      the new number of keys at this peer
- *   source - integer
- *      the id of the peer broadcasting the message
+ *   peer_to_update - integer
+ *      the id of the peer that needs to be updated
  *
  */
-void Daemon::broadcast_update_totals() {
-    char *new_total = int_to_msg_body(key_map.size());
-    char *source = int_to_msg_body(peer_id);
-    char *body = new char[strlen(new_total) + strlen(source) + 2];
+void Daemon::broadcast_update_totals(int total, int id) {
+    if (id == -1) {
+        id = peer_id;
+    }
+
+    if (total == -1) {
+        total = key_map.size();
+    }
+
+    char *new_total = int_to_msg_body(total);
+    char *peer_to_update = int_to_msg_body(id);
+    char *body = new char[strlen(new_total) + strlen(peer_to_update) + 2];
     strcpy(body, new_total);
     body[strlen(new_total)] = ';';
-    strcpy(&body[strlen(new_total) + 1], source);
+    strcpy(&body[strlen(new_total) + 1], peer_to_update);
 
-    close_all(broadcast(UPDATE_TOTALS, body, strlen(body) + 1));
+    std::vector<int> sockfds = broadcast(UPDATE_TOTALS, body, strlen(body) + 1);
+    wait_for_acks(sockfds);
+
     delete[] new_total;
-    delete[] source;
+    delete[] peer_to_update;
     delete[] body;
 }
 
@@ -891,4 +1154,50 @@ void Daemon::send_fail_response(int sockfd) {
     send_command(FAIL, NULL, 0, NULL, sockfd);
 }
 
+/*
+ * Message Purpose
+ *   acknowledges that a key has been found and will be removed
+ *
+ * Message Body: will_rebalance
+ *  will_rebalance - int
+ *      Will be 1 if a rebalance is required to remove this key, 0 otherwise
+ */
+void Daemon::send_remove_key_response(int sockfd, int will_rebalance) {
+    char *body = int_to_msg_body(will_rebalance);
+
+    send_command(REMOVE_RESPONSE, body, strlen(body) + 1, NULL, sockfd);
+}
+
+/*
+ * Message Purpose
+ *   asks (very politely) for the peer dest to give this peer a key
+ *
+ * This message has no body
+ */
+int Daemon::send_steal_key(Peer *dest) {
+    return send_command(STEAL_KEY, NULL, 0, &(dest->address));
+}
+
+/*
+ * Message Purpose
+ *   responds to a steal request with a key and the content associated with it
+ * Message Body: key;content
+ *   key - int
+ *      The key that is being stolen
+ *   content - char*
+ *      The content associated with the stolen key
+ */
+void Daemon::send_steal_response(int sockfd, int key, const char *content) {
+    char *key_str = int_to_msg_body(key);
+    char *body = new char[strlen(key_str) + strlen(content) + 2];
+
+    strcpy(body, key_str);
+    body[strlen(key_str)] = ';';
+    strcpy(&body[strlen(key_str) + 1], content);
+
+    send_command(STEAL_RESPONSE, body, strlen(body) + 1, NULL, sockfd);
+
+    delete[] key_str;
+    delete[] body;
+}
 

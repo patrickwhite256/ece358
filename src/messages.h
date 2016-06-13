@@ -6,6 +6,7 @@ extern const char *ALL_KEYS;
 extern const char *REMOVE_PEER;
 extern const char *C_ADD_CONTENT;
 extern const char *C_LOOKUP_CONTENT;
+extern const char *C_REMOVE_CONTENT;
 
 // message sent to client on success
 extern const char *ACKNOWLEDGE;
