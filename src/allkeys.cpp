@@ -49,7 +49,6 @@ int main(int argc, char **argv) {
     if((recvlen = recv(sock, allkeys_buffer, 100, 0)) < 0) {
         die_on_error();
     }
-    std::cout << recvlen << std::endl;
     std::cout << allkeys_buffer << std::endl;
 
     close(sock);

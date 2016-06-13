@@ -307,7 +307,6 @@ int Daemon::add_content_to_map(std::string content) {
  * @return did_rebalance - true if the operation caused a rebalance, false otherwise
  */
 bool Daemon::remove_key_from_map(int key) {
-    Peer *next = peer_set;
     bool rebalance = will_rebalance();
     key_map.erase(key);
 
