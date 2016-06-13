@@ -307,17 +307,9 @@ int Daemon::add_content_to_map(std::string content) {
  * @return did_rebalance - true if the operation caused a rebalance, false otherwise
  */
 bool Daemon::remove_key_from_map(int key) {
-    key_map.erase(key);
     Peer *next = peer_set;
-    bool rebalance = false;
-    do {
-        if (next->key_count - key_map.size() > 1) {
-            rebalance = true;
-            break;
-        }
-
-        next = next->next;
-    } while (next != peer_set);
+    bool rebalance = will_rebalance();
+    key_map.erase(key);
 
     if (rebalance) {
         peer_set = peer_set->previous;
@@ -451,7 +443,6 @@ void Daemon::wait_for_ack(int sockfd) {
     Message *ack = receive_message(sockfd);
     if (!msg_command_is(ack, ACKNOWLEDGE)) throw Exception(PROTOCOL_VIOLATION);
     delete ack;
-    close(sockfd);
 }
 
 /*
@@ -465,7 +456,6 @@ void Daemon::wait_for_acks(std::vector<int> fd_list) {
         if (strcmp(msgs[i]->command, ACKNOWLEDGE) != 0) throw Exception(PROTOCOL_VIOLATION);
         delete msgs[i];
     }
-    close_all(fd_list);
 }
 
 /*
