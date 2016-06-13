@@ -636,12 +636,15 @@ void Daemon::process_peer_data(Message *message) {
  * Message: ALL_KEYS
  * Body format: none (special)
  * Actions:
- *        - respond to message with comma-separated list of keys held by this peer
+ *        - respond to message with comma-separated list of keys held by this peer, plus 0
  */
 void Daemon::process_allkeys(Message *message) {
-    //TODO: create list of keys
-    const char *keys = "82,48,66,1";
-    if(send(message->connection, keys, strlen(keys) + 1, 0) < 0 ) {
+    std::stringstream stream;
+    for (std::map<int, std::string>::iterator it = key_map.begin(); it != key_map.end(); ++it) {
+        stream << it->first << ",";
+    }
+    stream << "0";
+    if(send(message->connection, stream.str().c_str(), stream.str().length() + 1, 0) < 0 ) {
         die_on_error();
     }
 }
@@ -828,6 +831,7 @@ void Daemon::process_steal_response(Message *message) {
  * Actions:
  *        - tell the peer being pointed to by the clock hand to add this content
  *        - move this peer's clock hand forward and tell everyone else to do the same
+ *        - broadcast this peer's new total
  *        - respond to the sender with the new key
  */
 void Daemon::process_client_add_content(Message *message) {
