@@ -7,6 +7,7 @@
 #include "client.h"
 #include "messages.h"
 #include "util.h"
+#include "mybind.h"
 
 Client::Client(const char *dest_addr, uint16_t dest_port) {
     in_addr addr;
@@ -25,7 +26,7 @@ Client::Client(const char *dest_addr, uint16_t dest_port) {
     client.sin_family = AF_INET;
     client.sin_addr.s_addr = htonl(INADDR_ANY);
     client.sin_port = 0;
-    if(bind(sock, (struct sockaddr *)&client, sizeof(struct sockaddr_in)) < 0) {
+    if(mybind(sock, &client) < 0) {
         die_on_error();
     }
 

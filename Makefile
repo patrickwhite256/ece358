@@ -29,21 +29,21 @@ clean:
 ########################     EXECS     #############################
 ####################################################################
 
-$(BIN_DIR)/addpeer: build/daemon.o build/peer.o build/add_peer.o build/util.o build/messages.o
+$(BIN_DIR)/addpeer: build/daemon.o build/peer.o build/add_peer.o build/util.o build/messages.o build/mybind.o
 	$(CXX) $(CXXFLAGS) $^ -o $@
 
 $(BIN_DIR)/allkeys: build/allkeys.o build/util.o
 	$(CXX) $(CXXFLAGS) $^ -o $@
 
-$(BIN_DIR)/removepeer: build/remove_peer.o build/util.o build/client.o build/messages.o
+$(BIN_DIR)/removepeer: build/remove_peer.o build/util.o build/client.o build/messages.o build/mybind.o
 	$(CXX) $(CXXFLAGS) $^ -o $@
 
-$(BIN_DIR)/addcontent: build/add_content.o build/util.o build/client.o build/messages.o
+$(BIN_DIR)/addcontent: build/add_content.o build/util.o build/client.o build/messages.o build/mybind.o
 	$(CXX) $(CXXFLAGS) $^ -o $@
 
-$(BIN_DIR)/lookupcontent: build/lookup_content.o build/util.o build/client.o build/messages.o
+$(BIN_DIR)/lookupcontent: build/lookup_content.o build/util.o build/client.o build/messages.o build/mybind.o
 	$(CXX) $(CXXFLAGS) $^ -o $@
 
-$(BIN_DIR)/removecontent: build/remove_content.o build/util.o build/client.o build/messages.o
+$(BIN_DIR)/removecontent: build/remove_content.o build/util.o build/client.o build/messages.o build/mybind.o
 	$(CXX) $(CXXFLAGS) $^ -o $@
 

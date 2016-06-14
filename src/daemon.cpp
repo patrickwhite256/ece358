@@ -13,6 +13,7 @@
 #include "messages.h"
 #include "peer.h"
 #include "util.h"
+#include "mybind.h"
 
 // messages that can be heard while listening
 const char *REQUEST_INFO     = "reqinfo";
@@ -199,7 +200,7 @@ int Daemon::send_command(const char *cmd_id, const char *cmd_body,
         client.sin_family = AF_INET;
         client.sin_addr.s_addr = htonl(INADDR_ANY);
         client.sin_port = 0;
-        if(bind(sock, (struct sockaddr *)&client, sizeof(struct sockaddr_in)) < 0) {
+        if(mybind(sock, &client) < 0) {
             die_on_error();
         }
 

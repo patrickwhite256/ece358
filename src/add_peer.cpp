@@ -10,6 +10,7 @@
 #include "util.h"
 #include "daemon.h"
 #include "basic_exception.h"
+#include "mybind.h"
 
 int main(int argc, char **argv) {
     int sockfd = socket(AF_INET, SOCK_STREAM, 0);
@@ -43,7 +44,7 @@ int main(int argc, char **argv) {
     memcpy(&(server.sin_addr), &srv_ip, sizeof(sockaddr_in));
     server.sin_port = 0;
 
-    if(bind(sockfd, (sockaddr *)&server, sizeof(sockaddr_in)) < 0) {
+    if(mybind(sockfd, &server) < 0) {
         die_on_error();
     }
 
