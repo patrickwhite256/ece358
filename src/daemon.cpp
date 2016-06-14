@@ -14,7 +14,6 @@
 #include "util.h"
 
 // messages that can be heard while listening
-const char *ADD_KEY          = "addakey";
 const char *REQUEST_INFO     = "reqinfo";
 const char *NEW_PEER         = "newpeer";
 const char *TICK_FWD         = "tickfwd";
@@ -54,7 +53,6 @@ void Daemon::loop() {
         Daemon::Message *message = receive_message();
         if(msg_command_is(message, ALL_KEYS)) {
             process_allkeys(message);
-        } else if (msg_command_is(message, ADD_KEY)) {
         } else if (msg_command_is(message, REQUEST_INFO)) {
             process_request_info(message);
         } else if (msg_command_is(message, NEW_PEER)) {
@@ -1082,33 +1080,6 @@ std::vector<int> Daemon::broadcast_get_key(int key) {
     delete[] body;
 
     return sockfds;
-}
-
-/*
- * Message purpose
- *   sends a key to the table of a specific peer
- *
- * Message Body Format: key;val
- *   key - integer
- *      the key to be added
- *   val - char*
- *      the string that the key maps to
- */
-
-int Daemon::send_add_key(Peer *dest, int key, const char *val) {
-    char *key_str = int_to_msg_body(key);
-    char *body = new char[strlen(key_str) + strlen(val) + 2];
-
-    strcpy(body, key_str);
-    body[strlen(key_str)] = ';';
-    strcpy(&body[strlen(key_str) + 1], val);
-
-    int sockfd = send_command(ADD_KEY, body, strlen(body) + 1, &(dest->address));
-
-    delete[] key_str;
-    delete[] body;
-
-    return sockfd;
 }
 
 /*
