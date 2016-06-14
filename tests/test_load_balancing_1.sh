@@ -4,7 +4,7 @@ source tests/testbase.sh
 
 create_network 5
 
-addr=$ADDRS[0]
+addr=${ADDRS[0]}
 validate_load_balancing 0
 key1=$(bin/addcontent $addr "1")
 validate_load_balancing 1
@@ -26,16 +26,22 @@ validate_load_balancing 8
 bin/removecontent $addr $key1
 validate_load_balancing 7
 
-bin/removepeer $ADDRS[1]
+bin/removepeer ${ADDRS[1]}
+unset ADDRS[1]
 validate_load_balancing 7
 
-bin/removepeer $ADDRS[3]
+bin/removepeer ${ADDRS[3]}
+unset ADDRS[3]
 validate_load_balancing 7
 
-bin/addpeer $addr
+bin/addpeer $addr > out
+new_addr=$(cat out)
+ADDRS[5]=$new_addr
 validate_load_balancing 7
 
-bin/addpeer $addr
+bin/addpeer $addr > out
+new_addr=$(cat out)
+ADDRS[6]=$new_addr
 validate_load_balancing 7
 
 bin/removecontent $addr $key8
