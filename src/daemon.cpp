@@ -35,6 +35,9 @@ const char *KEY_RESPONSE     = "keyresp";
 const char *REMOVE_RESPONSE  = "dropkey";
 const char *STEAL_RESPONSE   = "hereugo";
 
+const char *TOKEN_SEPARATOR     = "\x07";
+const char TOKEN_SEPARATOR_CHAR = '\x07';
+
 Daemon::Daemon(int sockfd, sockaddr_in server_addr) {
     this->sockfd = sockfd;
     this->peer_id = 0; // assume we are the first node until told otherwise
@@ -349,7 +352,7 @@ bool Daemon::remove_key_from_map(int key) {
  */
 
 void Daemon::resolve_remove_protocol(Message *remove_reply) {
-    std::vector<std::string> body_items = tokenize(remove_reply->body, ";");
+    std::vector<std::string> body_items = tokenize(remove_reply->body, TOKEN_SEPARATOR);
     bool did_rebalance = (bool)atoi(body_items.at(0).c_str());
     int num_ticks = atoi(body_items.at(1).c_str());
 
@@ -498,7 +501,7 @@ void Daemon::connect(const char *remote_ip, unsigned short remote_port) {
     remote.sin_addr = addr;
     remote.sin_port = remote_port;
     std::stringstream stream;
-    stream << inet_ntoa(peer_set->address.sin_addr) << ";"
+    stream << inet_ntoa(peer_set->address.sin_addr) << TOKEN_SEPARATOR
            << peer_set->address.sin_port;
     int sock = send_command(REQUEST_INFO, stream.str().c_str(), stream.str().length(), &remote); //can throw Exception
     Message *net_info = receive_message(sock);
@@ -583,7 +586,7 @@ void Daemon::process_request_info(Message *message) {
     } while (next != peer_set);
 
     // broadcast new peer data
-    std::vector<std::string> tokens = tokenize(message->body, ";");
+    std::vector<std::string> tokens = tokenize(message->body, TOKEN_SEPARATOR);
     in_addr addr;
     sockaddr_in peer_addr;
     inet_aton(tokens[0].c_str(), &addr);
@@ -593,8 +596,8 @@ void Daemon::process_request_info(Message *message) {
 
     Peer *new_peer = new Peer(peer_addr, 0, max_id + 1);
     std::stringstream stream;
-    stream << tokens[0].c_str() << ";"
-           << tokens[1].c_str() << ";"
+    stream << tokens[0].c_str() << TOKEN_SEPARATOR
+           << tokens[1].c_str() << TOKEN_SEPARATOR
            << new_peer->id;
     wait_for_acks(broadcast(NEW_PEER, stream.str().c_str(), stream.str().length()));
 
@@ -604,10 +607,10 @@ void Daemon::process_request_info(Message *message) {
     stream << new_peer->id;
     // currently next = peer_set
     do {
-        stream << ";"
-               << next->id << ";"
-               << next->key_count << ";"
-               << inet_ntoa(next->address.sin_addr) << ";"
+        stream << TOKEN_SEPARATOR
+               << next->id << TOKEN_SEPARATOR
+               << next->key_count << TOKEN_SEPARATOR
+               << inet_ntoa(next->address.sin_addr) << TOKEN_SEPARATOR
                << next->address.sin_port;
         next = next->next;
     } while (next != peer_set);
@@ -633,7 +636,7 @@ void Daemon::process_request_info(Message *message) {
  */
 void Daemon::process_new_peer(Message *message) {
     in_addr addr;
-    std::vector<std::string> tokens = tokenize(message->body, ";");
+    std::vector<std::string> tokens = tokenize(message->body, TOKEN_SEPARATOR);
     sockaddr_in peer_addr;
     inet_aton(tokens[0].c_str(), &addr);
     peer_addr.sin_family = AF_INET;
@@ -660,7 +663,7 @@ void Daemon::process_new_peer(Message *message) {
  *        - add self to network right before current head
  */
 void Daemon::process_peer_data(Message *message) {
-    std::vector<std::string> tokens = tokenize(message->body, ";");
+    std::vector<std::string> tokens = tokenize(message->body, TOKEN_SEPARATOR);
     in_addr addr;
     peer_id = atoi(tokens[0].c_str());
     Peer *me = peer_set;
@@ -711,7 +714,7 @@ void Daemon::process_allkeys(Message *message) {
  */
 void Daemon::process_peer_removal(Message *message) {
     send_command(ACKNOWLEDGE, NULL, 0, NULL, message->connection);
-    std::vector<std::string> tokens = tokenize(message->body, ";");
+    std::vector<std::string> tokens = tokenize(message->body, TOKEN_SEPARATOR);
     Peer *to_remove = find_peer_by_addr(tokens[0].c_str(),
                                         (unsigned short)atoi(tokens[1].c_str()));
     to_remove->previous->next = to_remove->next;
@@ -735,7 +738,7 @@ void Daemon::process_peer_removal(Message *message) {
 void Daemon::process_client_remove_peer(Message *message) {
     Peer *self = me();
     std::stringstream stream;
-    stream << inet_ntoa(self->address.sin_addr) << ";"
+    stream << inet_ntoa(self->address.sin_addr) << TOKEN_SEPARATOR
            << self->address.sin_port;
     wait_for_acks(
         broadcast(PEER_REMOVAL, stream.str().c_str(), stream.str().length())
@@ -754,7 +757,7 @@ void Daemon::process_client_remove_peer(Message *message) {
     self->next->previous = self->previous;
     for (std::map<int, std::string>::iterator it = key_map.begin(); it != key_map.end(); ++it) {
         std::stringstream stream;
-        stream << it->first << ";" << it->second;
+        stream << it->first << TOKEN_SEPARATOR << it->second;
         int sock = send_command(FORCE_KEY, stream.str().c_str(), stream.str().length(), &(peer_set->address));
         wait_for_ack(sock);
         close(sock);
@@ -771,7 +774,7 @@ void Daemon::process_client_remove_peer(Message *message) {
  *        - return the new key back to the sender of the message
  */
 void Daemon::process_add_content(Message *message) {
-    std::vector<std::string> body_items = tokenize(message->body, ";");
+    std::vector<std::string> body_items = tokenize(message->body, TOKEN_SEPARATOR);
     std::string content = body_items.at(0);
     int key = add_content_to_map(body_items.at(0));
     send_key_response(message->connection, key);
@@ -787,7 +790,7 @@ void Daemon::process_add_content(Message *message) {
  *        - update the peer with id source to have the total new_total
  */
 void Daemon::process_update_totals(Message *message) {
-    std::vector<std::string>  body_items = tokenize(message->body, ";");
+    std::vector<std::string>  body_items = tokenize(message->body, TOKEN_SEPARATOR);
     int new_total = atoi(body_items.at(0).c_str());
     int source_id = atoi(body_items.at(1).c_str());
 
@@ -889,7 +892,7 @@ void Daemon::process_steal_key(Message *message) {
  *        - add the key-value pair that was given to us in the response to this peer's table
  */
 void Daemon::process_steal_response(Message *message) {
-    std::vector<std::string> body_items = tokenize(message->body, ";");
+    std::vector<std::string> body_items = tokenize(message->body, TOKEN_SEPARATOR);
     int key = atoi(body_items.at(0).c_str());
     std::string content = body_items.at(1);
 
@@ -1023,7 +1026,7 @@ void Daemon::process_client_remove_content(Message *message) {
  *        - add key and value to map
  */
 void Daemon::process_force_key(Message *message) {
-    std::vector<std::string> tokens = tokenize(message->body, ";");
+    std::vector<std::string> tokens = tokenize(message->body, TOKEN_SEPARATOR);
     key_map.insert(std::pair<int, std::string>(atoi(tokens[0].c_str()), tokens[1]));
     me()->key_count = key_map.size();
 
@@ -1079,7 +1082,7 @@ void Daemon::broadcast_update_totals(int total, int id) {
     char *peer_to_update = int_to_msg_body(id);
     char *body = new char[strlen(new_total) + strlen(peer_to_update) + 2];
     strcpy(body, new_total);
-    body[strlen(new_total)] = ';';
+    body[strlen(new_total)] = TOKEN_SEPARATOR_CHAR;
     strcpy(&body[strlen(new_total) + 1], peer_to_update);
 
     std::vector<int> sockfds = broadcast(UPDATE_TOTALS, body, strlen(body) + 1);
@@ -1123,7 +1126,7 @@ std::vector<int> Daemon::broadcast_get_key(int key) {
     char *body = new char[strlen(key_str) + strlen(source) + 2];
 
     strcpy(body, key_str);
-    body[strlen(key_str)] = ';';
+    body[strlen(key_str)] = TOKEN_SEPARATOR_CHAR;
     strcpy(&body[strlen(key_str) + 1], source);
 
     std::vector<int> sockfds = broadcast(GET_KEY, body, strlen(body) + 1);
@@ -1170,7 +1173,7 @@ int Daemon::send_add_content(Peer *dest, const char* content) {
     char *body = new char[strlen(content) + strlen(source) + 2];
 
     strcpy(body, content);
-    body[strlen(content)] = ';';
+    body[strlen(content)] = TOKEN_SEPARATOR_CHAR;
     strcpy(&body[strlen(content) + 1], source);
 
     int sockfd = send_command(ADD_CONTENT, body, strlen(body) + 1, &(dest->address));
@@ -1244,7 +1247,7 @@ void Daemon::send_remove_key_response(int sockfd, int will_rebalance) {
     char *rebalance_str = int_to_msg_body(will_rebalance);
     char *body = new char[strlen(rebalance_str) + strlen(num_ticks_str) + 2];
     strcpy(body, rebalance_str);
-    body[strlen(rebalance_str)] = ';';
+    body[strlen(rebalance_str)] = TOKEN_SEPARATOR_CHAR;
     strcpy(&body[strlen(rebalance_str) + 1], num_ticks_str);
 
     send_command(REMOVE_RESPONSE, body, strlen(body) + 1, NULL, sockfd);
@@ -1278,7 +1281,7 @@ void Daemon::send_steal_response(int sockfd, int key, const char *content) {
     char *body = new char[strlen(key_str) + strlen(content) + 2];
 
     strcpy(body, key_str);
-    body[strlen(key_str)] = ';';
+    body[strlen(key_str)] = TOKEN_SEPARATOR_CHAR;
     strcpy(&body[strlen(key_str) + 1], content);
 
     send_command(STEAL_RESPONSE, body, strlen(body) + 1, NULL, sockfd);
