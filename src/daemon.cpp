@@ -42,6 +42,8 @@ Daemon::Daemon(int sockfd, sockaddr_in server_addr) {
     this->sockfd = sockfd;
     this->peer_id = 0; // assume we are the first node until told otherwise
     this->key_counter = 0;
+    this->id_counter = 0;
+
     peer_set = new Peer(server_addr, 0, 0);
     peer_set->next = peer_set;
     peer_set->previous = peer_set;
@@ -575,16 +577,6 @@ Peer *Daemon::me() {
  *        - add it to the peer list, right before the current head
  */
 void Daemon::process_request_info(Message *message) {
-    // determine max id
-    int max_id = 0;
-    Peer *next = peer_set;
-    do {
-        if (next->id > max_id) {
-            max_id = next->id;
-        }
-        next = next->next;
-    } while (next != peer_set);
-
     // broadcast new peer data
     std::vector<std::string> tokens = tokenize(message->body, TOKEN_SEPARATOR);
     in_addr addr;
@@ -594,7 +586,8 @@ void Daemon::process_request_info(Message *message) {
     peer_addr.sin_addr = addr;
     peer_addr.sin_port = atoi(tokens[1].c_str());
 
-    Peer *new_peer = new Peer(peer_addr, 0, max_id + 1);
+    id_counter++;
+    Peer *new_peer = new Peer(peer_addr, 0, id_counter);
     std::stringstream stream;
     stream << tokens[0].c_str() << TOKEN_SEPARATOR
            << tokens[1].c_str() << TOKEN_SEPARATOR
@@ -605,7 +598,8 @@ void Daemon::process_request_info(Message *message) {
     stream.str(""); //reset stringstream
     stream.clear();
     stream << new_peer->id;
-    // currently next = peer_set
+
+    Peer *next = peer_set;
     do {
         stream << TOKEN_SEPARATOR
                << next->id << TOKEN_SEPARATOR
@@ -642,14 +636,16 @@ void Daemon::process_new_peer(Message *message) {
     peer_addr.sin_family = AF_INET;
     peer_addr.sin_addr = addr;
     peer_addr.sin_port = atoi(tokens[1].c_str());
-    Peer *new_peer = new Peer(peer_addr, 0, atoi(tokens[2].c_str()));
+
+    int new_id = atoi(tokens[2].c_str());
+    id_counter = new_id;
+    Peer *new_peer = new Peer(peer_addr, 0, new_id);
     Peer *prev = peer_set->previous;
 
     new_peer->previous = prev;
     new_peer->next = peer_set;
     prev->next = new_peer;
     peer_set->previous = new_peer;
-
     print_peers();
     send_command(ACKNOWLEDGE, NULL, 0, NULL, message->connection);
 }
@@ -658,7 +654,7 @@ void Daemon::process_new_peer(Message *message) {
  * Message: PEER_DATA
  * Body Format: new_peer_id;(peer_id;key_count;ip_addr;port)+
  * Actions:
- *        - assign own id to new_peer_id
+ *        - assign own id and id_counter to new_peer_id
  *        - construct representation of network
  *        - add self to network right before current head
  */
@@ -668,6 +664,7 @@ void Daemon::process_peer_data(Message *message) {
     peer_id = atoi(tokens[0].c_str());
     Peer *me = peer_set;
     me->id = peer_id;
+    id_counter = peer_id;
     // all peers follow this one, and then the pointer is set to the one after this
     for(size_t i = 1; i < tokens.size(); i += 4) {
         inet_aton(tokens[i + 2].c_str(), &addr);

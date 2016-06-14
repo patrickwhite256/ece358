@@ -24,4 +24,5 @@ value4=$(bin/lookupcontent $addr $key4)
 [[ $value1 == "one" ]]
 [[ $value2 == "two" ]]
 [[ $value3 == "three" ]]
-[[ $value3 == "four" ]]
+[[ $value4 == "four" ]]
+
