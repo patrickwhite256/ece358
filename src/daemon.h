@@ -96,6 +96,7 @@ class Daemon {
     bool remove_key_from_map(int key);
     void resolve_remove_protocol(Message *remove_reply);
     bool will_rebalance();
+    unsigned int balance_max();
 
     //debug
     void print_peers();
