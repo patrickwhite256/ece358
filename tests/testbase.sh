@@ -16,8 +16,8 @@ count_addpeer_procs(){
 create_network() {
     bin/addpeer > out
     addr=$(cat out)
-    ADDRS=($addr)
-    for i in {1..$1}; do
+    ADDRS=("$addr")
+    for (( i=1; i<$1; i++ )); do
         bin/addpeer $addr> out
         addr=$(cat out)
         ADDRS[$i]=$addr
@@ -31,16 +31,16 @@ validate_load_balancing() {
     total_keys=0
     total_peers=0
     counts=()
-    for addr in ${ADDRS[@]}; do
+    for addr in "${ADDRS[@]}"; do
         keylist=$(bin/allkeys $addr)
-        count=fgrep -o "," <<< keylist | wc -l
-        $counts[$total_peers]=$count
+        count=$(fgrep -o "," <<< $keylist | wc -l)
+        counts[$total_peers]=$count
         total_peers=$(( $total_peers + 1 ))
         total_keys=$(( $total_keys + $count ))
     done
     upper=$(python -c "import math;print int(math.ceil($total_keys / float($total_peers)))")
     lower=$(python -c "import math;print int(math.floor($total_keys / float($total_peers)))")
-    [[ $keys == $1 ]]
+    [[ $total_keys == $1 ]]
     for count in ${counts[@]}; do
         [ $count -le $upper ]
         [ $count -ge $lower ]

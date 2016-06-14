@@ -71,6 +71,7 @@ class Daemon {
     void process_allkeys(Message *message);
     void process_steal_key(Message *message);
     void process_steal_response(Message *message);
+    void process_force_key(Message *message);
 
     // Methods that process messages from the client
     void process_client_remove_peer(Message *message);

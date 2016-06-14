@@ -2,6 +2,8 @@
 
 source tests/testbase.sh
 
+kill_addpeer_procs
+
 create_network 5
 
 addr=$ADDRS[0]
@@ -22,15 +24,3 @@ key7=$(bin/addcontent $addr "7")
 validate_load_balancing 7
 key8=$(bin/addcontent $addr "8")
 validate_load_balancing 8
-
-# bin/removepeer $ADDRS[1]
-# validate_load_balancing 8
-
-# bin/removepeer $ADDRS[3]
-# validate_load_balancing 8
-
-# bin/addpeer $addr
-# validate_load_balancing 8
-
-# bin/addpeer $addr
-# validate_load_balancing 8
