@@ -24,26 +24,27 @@ $(_OBJECTS): build/%.o: src/%.cpp
 
 clean:
 	rm -rf *.d *.o $(EXECS) build
+	mkdir build
 
 ####################################################################
 ########################     EXECS     #############################
 ####################################################################
 
-addpeer: build build/daemon.o build/peer.o build/add_peer.o build/util.o build/messages.o build/mybind.o
+addpeer: build/daemon.o build/peer.o build/add_peer.o build/util.o build/messages.o build/mybind.o
 	$(CXX) $(CXXFLAGS) $^ -o $@
 
-allkeys: build build/allkeys.o build/util.o
+allkeys: build/allkeys.o build/util.o
 	$(CXX) $(CXXFLAGS) $^ -o $@
 
-removepeer: build build/remove_peer.o build/util.o build/client.o build/messages.o build/mybind.o
+removepeer: build/remove_peer.o build/util.o build/client.o build/messages.o build/mybind.o
 	$(CXX) $(CXXFLAGS) $^ -o $@
 
-addcontent: build build/add_content.o build/util.o build/client.o build/messages.o build/mybind.o
+addcontent: build/add_content.o build/util.o build/client.o build/messages.o build/mybind.o
 	$(CXX) $(CXXFLAGS) $^ -o $@
 
-lookupcontent: build build/lookup_content.o build/util.o build/client.o build/messages.o build/mybind.o
+lookupcontent: build/lookup_content.o build/util.o build/client.o build/messages.o build/mybind.o
 	$(CXX) $(CXXFLAGS) $^ -o $@
 
-removecontent: build build/remove_content.o build/util.o build/client.o build/messages.o build/mybind.o
+removecontent: build/remove_content.o build/util.o build/client.o build/messages.o build/mybind.o
 	$(CXX) $(CXXFLAGS) $^ -o $@
 
