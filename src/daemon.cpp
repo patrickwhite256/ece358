@@ -417,7 +417,7 @@ unsigned int Daemon::balance_max() {
         next = next->next;
     } while (next != peer_set);
 
-    return ceil(total / num_peers);
+    return ceil((float)total / (float)num_peers);
 }
 
 /*
