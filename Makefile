@@ -1,14 +1,14 @@
 CXX=g++
-DEBUG ?= -DDEBUG
+DEBUG=
 CXXFLAGS= -g -Wall $(DEBUG)
 EXECS=addpeer allkeys removepeer addcontent lookupcontent removecontent
-BIN_DIR=bin
+BIN_DIR=.
 _EXECS=$(patsubst %,$(BIN_DIR)/%, $(EXECS))
 _OBJECTS=$(patsubst src/%.cpp,build/%.o, $(wildcard src/*.cpp))
 
 .PHONY: all clean test
 
-all: $(BIN_DIR) build $(_EXECS)
+all: build $(_EXECS)
 
 test:
 	tests/run_tests.sh
@@ -23,7 +23,7 @@ $(_OBJECTS): build/%.o: src/%.cpp
 	$(CXX) $(CXXFLAGS) $^ -c -o $@
 
 clean:
-	rm -rf *.d *.o $(BIN_DIR) build
+	rm -rf *.d *.o $(EXECS) build
 
 ####################################################################
 ########################     EXECS     #############################

@@ -21,3 +21,9 @@ build
 
 # Executables
 bin
+addcontent
+addpeer
+allkeys
+lookupcontent
+removecontent
+removepeer
