@@ -25,6 +25,7 @@ const char *GET_KEY          = "getakey";
 const char *ADD_CONTENT      = "addcont";
 const char *PEER_REMOVAL     = "iamdead";
 const char *STEAL_KEY        = "giffkey";
+const char *FORCE_KEY        = "takekey";
 
 // messages that are part of protocols
 const char *PEER_DATA        = "peerdta";
@@ -82,6 +83,8 @@ void Daemon::loop() {
             process_remove_key(message);
         } else if (msg_command_is(message, C_REMOVE_CONTENT)) {
             process_client_remove_content(message);
+        } else if (msg_command_is(message, FORCE_KEY)) {
+            process_force_key(message);
         }
 
         delete message;
@@ -126,7 +129,7 @@ Daemon::Message *Daemon::receive_message(int sock) {
     socklen_t alen = sizeof(sockaddr_in);
     if(sock == -1) {
         sock = accept(sockfd, (sockaddr *)&client, &alen);
-#ifdef DEBUG
+#ifdef VERBOSE
         std::cout << "connection from " << inet_ntoa(client.sin_addr)
                   << ":" << ntohs(client.sin_port) << std::endl;
 #endif
@@ -142,7 +145,7 @@ Daemon::Message *Daemon::receive_message(int sock) {
     char *cmd = new char[8];
     memcpy(cmd, initial_buffer, 7);
     cmd[7] = '\0';
-#ifdef DEBUG
+#ifdef VERBOSE
     std::cout << "received " << cmd << std::endl;
 #endif
 
@@ -215,7 +218,7 @@ int Daemon::send_command(const char *cmd_id, const char *cmd_body,
     if (body_len > 0) {
         strcpy(&msg[9], cmd_body);
     }
-#ifdef DEBUG
+#ifdef VERBOSE
     std::cout << "sent " << cmd_id << std::endl;
 #endif
 
@@ -686,9 +689,27 @@ void Daemon::process_client_remove_peer(Message *message) {
     wait_for_acks(
         broadcast(PEER_REMOVAL, stream.str().c_str(), stream.str().length())
     );
-    send_command(ACKNOWLEDGE, NULL, 0, NULL, message->connection);
-    //TODO : distribute keys
     terminated = true;
+
+    if (peer_set == self) {
+        peer_set = peer_set->next;
+        // if this is the last peer don't distribute
+        if (peer_set == self) {
+            send_command(ACKNOWLEDGE, NULL, 0, NULL, message->connection);
+            return;
+        }
+    }
+    self->previous->next = self->next;
+    self->next->previous = self->previous;
+    for (std::map<int, std::string>::iterator it = key_map.begin(); it != key_map.end(); ++it) {
+        std::stringstream stream;
+        stream << it->first << ";" << it->second;
+        int sock = send_command(FORCE_KEY, stream.str().c_str(), stream.str().length(), &(peer_set->address));
+        wait_for_ack(sock);
+        close(sock);
+        peer_set = peer_set->next;
+    }
+    send_command(ACKNOWLEDGE, NULL, 0, NULL, message->connection);
 }
 
 /*
@@ -849,6 +870,13 @@ void Daemon::process_client_add_content(Message *message) {
 
         strcpy(reply, resp->body);
         delete resp;
+
+        Message *update_msg = receive_message();
+        if(!msg_command_is(update_msg, UPDATE_TOTALS)){
+            throw Exception(PROTOCOL_VIOLATION);
+        }
+        process_update_totals(update_msg);
+        delete update_msg;
     }
 
     peer_set = peer_set->next;
@@ -937,6 +965,24 @@ void Daemon::process_client_remove_content(Message *message) {
     send_command(ACKNOWLEDGE, NULL, 0, NULL, message->connection);
 }
 
+/**
+ * Message: FORCE_KEY
+ * Format: key,value
+ * Actions:
+ *        - add key and value to map
+ */
+void Daemon::process_force_key(Message *message) {
+    std::vector<std::string> tokens = tokenize(message->body, ";");
+    key_map.insert(std::pair<int, std::string>(atoi(tokens[0].c_str()), tokens[1]));
+    me()->key_count = key_map.size();
+
+    broadcast_update_totals();
+    broadcast_tick_fwd();
+    send_command(ACKNOWLEDGE, NULL, 0, NULL, message->connection);
+
+    print_table();
+}
+
 /*
  * Message Purpose
  *   broadcasts a message indicating that all peers should move their clock hands forward
@@ -944,7 +990,7 @@ void Daemon::process_client_remove_content(Message *message) {
  * This message has no body
  */
 void Daemon::broadcast_tick_fwd() {
-    close_all(broadcast(TICK_FWD, NULL, 0));
+    wait_for_all(broadcast(TICK_FWD, NULL, 0));
 }
 
 /*
