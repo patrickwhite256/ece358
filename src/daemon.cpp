@@ -1,4 +1,5 @@
 #include <cstring>
+#include <cmath>
 #include <algorithm>
 #include <arpa/inet.h>
 #include <iostream>
@@ -307,13 +308,14 @@ int Daemon::add_content_to_map(std::string content) {
  * @return did_rebalance - true if the operation caused a rebalance, false otherwise
  */
 bool Daemon::remove_key_from_map(int key) {
-    Peer *next = peer_set;
     bool rebalance = will_rebalance();
     key_map.erase(key);
 
     if (rebalance) {
-        peer_set = peer_set->previous;
-        broadcast_tick_back();
+        do {
+            peer_set = peer_set->previous;
+            broadcast_tick_back();
+        } while (peer_set->key_count < balance_max() || peer_set == me());
 
         int sockfd = send_steal_key(peer_set);
         Message *resp = receive_message(sockfd);
@@ -346,15 +348,19 @@ bool Daemon::remove_key_from_map(int key) {
  */
 
 void Daemon::resolve_remove_protocol(Message *remove_reply) {
-    bool did_rebalance = (bool)atoi(remove_reply->body);
+    std::vector<std::string> body_items = tokenize(remove_reply->body, ";");
+    bool did_rebalance = (bool)atoi(body_items.at(0).c_str());
+    int num_ticks = atoi(body_items.at(1).c_str());
 
     if (did_rebalance) {
-        Message *tick = receive_message();
-        if (!msg_command_is(tick, TICK_BACK)) {
-            throw Exception(PROTOCOL_VIOLATION);
+        for (int i = 0; i < num_ticks; ++i) {
+            Message *tick = receive_message();
+            if (!msg_command_is(tick, TICK_BACK)) {
+                throw Exception(PROTOCOL_VIOLATION);
+            }
+            process_tick_back(tick);
+            delete tick;
         }
-        process_tick_back(tick);
-        delete tick;
 
         if (peer_set == me()) {
             Message *steal = receive_message();
@@ -393,6 +399,25 @@ bool Daemon::will_rebalance() {
     } while (next != peer_set);
 
     return false;
+}
+
+/*
+ * balance_max
+ *
+ * @return max - the maximum number of keys a peer can have so that the network is balanced
+ */
+unsigned int Daemon::balance_max() {
+    Peer *next = peer_set;
+    int total = 0;
+    int num_peers = 0;
+
+    do {
+        total += next->key_count;
+        num_peers++;
+        next = next->next;
+    } while (next != peer_set);
+
+    return ceil(total / num_peers);
 }
 
 /*
@@ -482,8 +507,35 @@ void Daemon::connect(const char *remote_ip, unsigned short remote_port) {
     }
     process_peer_data(net_info);
 
+    // rebalance the network
+    int keys_to_take = balance_max();
+
+    for (int i = 0; i < keys_to_take; ++i) {
+        peer_set = peer_set->previous;
+        broadcast_tick_back();
+
+        if (peer_set == me()) {
+            i--;
+            continue;
+        }
+
+        int sockfd = send_steal_key(peer_set);
+        Message *reply = receive_message(sockfd);
+        process_steal_response(reply);
+        delete reply;
+
+        me()->key_count++;
+        peer_set->key_count--;
+    }
+
+    Peer *next = peer_set;
+
+    do {
+        broadcast_update_totals(next->key_count, next->id);
+        next = next->next;
+    } while (next != peer_set);
+
     print_peers();
-    // TODO: get keys from other peers
     delete net_info;
 }
 
@@ -1148,14 +1200,37 @@ void Daemon::send_fail_response(int sockfd) {
  * Message Purpose
  *   acknowledges that a key has been found and will be removed
  *
- * Message Body: will_rebalance
+ * Message Body: will_rebalance;num_ticks
  *  will_rebalance - int
  *      Will be 1 if a rebalance is required to remove this key, 0 otherwise
+ *  num_ticks - int
+        Only nonzero if will_rebalance is 1. indicates the number of times the clock
+        will tick back
  */
 void Daemon::send_remove_key_response(int sockfd, int will_rebalance) {
-    char *body = int_to_msg_body(will_rebalance);
+    int num_ticks = 0;
+
+    if (will_rebalance) {
+        Peer *prev = peer_set;
+
+        do {
+           prev = prev->previous;
+           num_ticks++;
+        } while (prev->key_count < balance_max() || prev == me());
+    }
+
+    char *num_ticks_str = int_to_msg_body(num_ticks);
+    char *rebalance_str = int_to_msg_body(will_rebalance);
+    char *body = new char[strlen(rebalance_str) + strlen(num_ticks_str) + 2];
+    strcpy(body, rebalance_str);
+    body[strlen(rebalance_str)] = ';';
+    strcpy(&body[strlen(rebalance_str) + 1], num_ticks_str);
 
     send_command(REMOVE_RESPONSE, body, strlen(body) + 1, NULL, sockfd);
+
+    delete[] num_ticks_str;
+    delete[] rebalance_str;
+    delete[] body;
 }
 
 /*
