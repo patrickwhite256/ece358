@@ -30,6 +30,7 @@ class Daemon {
     int sockfd;
     int peer_id;
     int key_counter;
+    int id_counter;
     Peer *peer_set;
     bool terminated;
     std::map<int, std::string> key_map;
