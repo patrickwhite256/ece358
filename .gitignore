@@ -19,5 +19,12 @@ build
 *.a
 *.lib
 
+# Latex crap
+*.dvi
+*.pdf
+*.aux
+*.log
+*.fls
+
 # Executables
 bin
