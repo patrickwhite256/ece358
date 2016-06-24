@@ -39,7 +39,10 @@ A network that would cause this to occur looks like this:
     (3) edge node [above] {1} (4)
     (4) edge node [left] {1} (5);
 \end{tikzpicture}
-
-If the cost from $D \leftrightarrow E$ is updated to some large value (e.g. 50), the first update will result in D routing through C to get to E (assuming a path cost of 3). Using poisoned reverse, C will choose to route to E through A (cost 4). A will then choose to route through B (cost 5), and then B will still think it can route through D with a cost of 2. Then the update from D will hit B. B will update its cost to E to 4 through D, since the reverse is not poisoned as D thinks this path of cost 3 is reachable through C. This update is sent to A, who recomputes the cost of the path through B to now be 6. At this point, the loop has started, and the propagation will travel from $A \rightarrow C \rightarrow D \rightarrow B$ ... until the algorithm decides to take the 50-cost edge from D to E. 
+If the cost from $D \leftrightarrow E$ is updated to some large value (e.g. 50), assume that D notices the change first.
+The first update will result in D routing through C to get to E (assuming a path cost of 3). D then broadcasts the update to B and C.
+Assume C receives the update first. Using poisoned reverse, C will choose to route to E through A (cost 4). 
+A will then choose to route through B (cost 4), and then B will still think it can route through D with a cost of 2.
+At this point, before the other updates are processed, the loop has started, and a packet will travel from $A \rightarrow C \rightarrow D \rightarrow B \rightarrow A \ldots$ until the routing tables converge to taking the path from D to E.
 
 \end{document}
