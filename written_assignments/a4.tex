@@ -71,7 +71,7 @@ If $u\rightsquigarrow x \rightarrow y$ is a shortest path, then the length of th
 \section{}
 Here we answer question 5
 \section{}
-Here we answer question 6
+When using the distance vector algorithm from an initial state where all path lengths are unknown, after $N$ iterations, each node will be aware of the shortest path to each node consisting of $N$ edges. This means the number of iterations it will take to converge is equal to the longest (in # of edges) shortest path in the network plus 1 (since one more iteration has to occur in order for the last nodes to update to broadcast one last message). The greatest number of edges a shortest path can have is $N - 1$, we will converge in at most $N$ iterations.
 \section{}
 A network that would cause this to occur looks like this:
 
