@@ -58,7 +58,13 @@
     abcd & 0 & 122 & 844 \\\bottomrule
 \end{tabular}
 \section{}
-Here we answer question 3
+\begin{itemize}
+    \item[a.] The value of the checksum received by $D$ is not necessarily the same as the checksum sent by $S$. This is because the checksum is recalculated at each hop, and at each hop the header changes (at minimum, the TTL field changes). It is possible for the value to be the same (multiple values of the header map to the same value for the checksum) but unless the source and destination are on the same physical network (and there are no hops between them) it is unlikely the header value remains unchanged.
+    \item[b.] Alice is incorrect. Consider the initial header bytes \texttt{0x0000 5555 5555 5555 5555}. The sum of each 16-bit pair is \texttt{0x15554}. Adding the carry back gives \texttt{0x5555}. Taking the 1s complement gives \texttt{0xaaaa}, the checksum value sent by the source.
+        Not consider that three of the bytes become flipped in transit, so the header becomes \texttt{0x0000 5554 5557 5554 5555}. The sum of each 16-bit pair is \texttt{0x15554}. Adding the carry back gives \texttt{0x5555}. Taking the 1s complement gives \texttt{0xaaaa}, the checksum value sent by the source, even though an odd number of bits were flipped.
+    \item[c.] The value of the checksum received by $D$ is not necessarily the same as the checksum sent by $S$. This is because a NAT server can rewrite the UDP header of a packet, which includes recomputing the checksum. Although the UDP header is not recomputed at every hop, it can be recomputed whenever it passes through a NAT.
+    \item[d.] It is not necessarily true that if a response is not received, the MTU is not supported. It is possible that the echo service is not working or not enabled on the remote host, so even though it receives the (non-fragmented) packet destined for port 7, it does not reply.
+\end{itemize}
 \section{}
 If $u\rightsquigarrow x \rightarrow y$ is a shortest path, then the length of this path is $\delta(y)$. If before $x$ entered $N'$, $D(y)$ was some value greater than $\delta(y)$, then after $x$ is added to $N'$ the value of $D(y)$ will be updated to $\delta(y)$. Therefore at this stage in the algorithm, $D(y) = \delta(y)$.
 \section{}
