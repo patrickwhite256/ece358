@@ -10,7 +10,44 @@
 \title{ECE358 S'16 Assignment 4}
 \maketitle
 \section{}
-Here we answer question 1
+\subsection*{a}
+\begin{itemize}
+    \item[A] 1.2.3.0/30
+    \item[B] 1.2.3.0
+    \item[C] 1.2.3.1
+    \item[D] 1.2.3.2
+    \item[E] 1.2.3.4/30
+    \item[F] 1.2.3.4
+    \item[G] 1.2.3.5
+    \item[H] 1.2.3.6
+    \item[I] 10.10.0.0/16
+    \item[J] 10.20.0.0/16
+    \item[K] 1.2.3.8/30
+    \item[L] 1.2.3.8
+    \item[M] 1.2.3.9
+    \item[N] 1.2.3.10
+    \item[O] 10.30.0.0/16
+    \item[P] 10.40.0.0/16
+\end{itemize}
+\subsection*{b}
+\subsubsection*{i: Sales Router}
+\begin{tabular}{c c c}
+    \toprule
+    \textbf{Prefix} & \textbf{Next Hop} & \textbf{Interface} \\\midrule
+    1.2.3.0/30 & myself & C \\
+    1.2.3.4/30 & myself & F \\
+    1.2.3.8/30 & 1.2.3.2 & C \\
+    0.0.0.0/0 & 1.2.3.0 & C \\\bottomrule
+\end{tabular}
+\subsubsection*{ii: Marketing Router}
+\begin{tabular}{c c c}
+    \toprule
+    \textbf{Prefix} & \textbf{Next Hop} & \textbf{Interface} \\\midrule
+    1.2.3.0/30 & myself & D \\
+    1.2.3.4/30 & 1.2.3.1 & D \\
+    1.2.3.8/30 & myself & L \\
+    0.0.0.0/0 & 1.2.3.0 & D \\\bottomrule
+\end{tabular}
 \section{}
 \begin{tabular}{c c c c}
     \toprule
