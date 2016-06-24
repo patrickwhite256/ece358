@@ -2,6 +2,7 @@
 \usepackage[utf8]{inputenc}
 \usepackage{amsmath}
 \usepackage{amsfonts}
+\usepackage{booktabs}
 \usepackage[margin=1in]{geometry}
 \usepackage{amssymb}
 \author{Joel Mizzoni (jmizzoni), Patrick White (ps2white)}
@@ -11,7 +12,14 @@
 \section{}
 Here we answer question 1
 \section{}
-Here we answer question 2
+\begin{tabular}{c c c c}
+    \toprule
+    \textbf{Identification} & \textbf{More Fragments} & \textbf{Fragment Offset} & \textbf{Total Length} \\\midrule
+    abcd & 1 & 0 & 500 \\
+    abcd & 1 & 60 & 500 \\
+    abcd & 1 & 120 & 36 \\
+    abcd & 0 & 122 & 844 \\\bottomrule
+\end{tabular}
 \section{}
 Here we answer question 3
 \section{}
