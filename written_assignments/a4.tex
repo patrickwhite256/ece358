@@ -74,7 +74,7 @@ Secondly, the shortest path from $x$ to $y$ including neighbor $v$ of $x$ is $x 
 From the previous two, the shortest path from $x$ to $y$ is $x \rightarrow v \rightsquigarrow y$ where $v\in neigh(x)$.
 Therefore, the length of the shortest path from $x$ to $y$ is $\min\limits_{v\in neigh(x)}\left\{c(x,v) + d_v(y)\right\}$.
 \section{}
-When using the distance vector algorithm from an initial state where all path lengths are unknown, after $N$ iterations, each node will be aware of the shortest path to each node consisting of $N$ edges. This means the number of iterations it will take to converge is equal to the longest (in # of edges) shortest path in the network plus 1 (since one more iteration has to occur in order for the last nodes to update to broadcast one last message). The greatest number of edges a shortest path can have is $N - 1$, we will converge in at most $N$ iterations.
+When using the distance vector algorithm from an initial state where all path lengths are unknown, after $N$ iterations, each node will be aware of the shortest path to each node consisting of $N$ edges. This means the number of iterations it will take to converge is equal to the longest (in \# of edges) shortest path in the network plus 1 (since one more iteration has to occur in order for the last nodes to update to broadcast one last message). The greatest number of edges a shortest path can have is $N - 1$, we will converge in at most $N$ iterations.
 \section{}
 A network that would cause this to occur looks like this:
 
@@ -93,6 +93,7 @@ A network that would cause this to occur looks like this:
     (3) edge node [above] {1} (4)
     (4) edge node [left] {1} (5);
 \end{tikzpicture}
+
 If the cost from $D \leftrightarrow E$ is updated to some large value (e.g. 50), assume that D notices the change first.
 The first update will result in D routing through C to get to E (assuming a path cost of 3). D then broadcasts the update to B and C.
 Assume C receives the update first. Using poisoned reverse, C will choose to route to E through A (cost 4). 
