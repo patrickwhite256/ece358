@@ -69,7 +69,10 @@
 \section{}
 If $u\rightsquigarrow x \rightarrow y$ is a shortest path, then the length of this path is $\delta(y)$. If before $x$ entered $N'$, $D(y)$ was some value greater than $\delta(y)$, then after $x$ is added to $N'$ the value of $D(y)$ will be updated to $\delta(y)$. Therefore at this stage in the algorithm, $D(y) = \delta(y)$.
 \section{}
-Here we answer question 5
+First, we assert that any path (and therefore the shortest path) from $x$ to $y$ includes exactly one of the edges from $x$ to a vertex in $neigh(x)$.
+Secondly, the shortest path from $x$ to $y$ including neighbor $v$ of $x$ is $x \rightarrow v \rightsquigarrow y$ where $v \rightsquigarrow y$ is the shortest path from $v$ to $y$. This path has length $c(x,v) + d_v(y)$.
+From the previous two, the shortest path from $x$ to $y$ is $x \rightarrow v \rightsquigarrow y$ where $v\in neigh(x)$.
+Therefore, the length of the shortest path from $x$ to $y$ is $\min\limits_{v\in neigh(x)}\left\{c(x,v) + d_v(y)\right\}$.
 \section{}
 When using the distance vector algorithm from an initial state where all path lengths are unknown, after $N$ iterations, each node will be aware of the shortest path to each node consisting of $N$ edges. This means the number of iterations it will take to converge is equal to the longest (in # of edges) shortest path in the network plus 1 (since one more iteration has to occur in order for the last nodes to update to broadcast one last message). The greatest number of edges a shortest path can have is $N - 1$, we will converge in at most $N$ iterations.
 \section{}
