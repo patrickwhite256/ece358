@@ -13,7 +13,17 @@
 \section{}
 In which we answer question 1
 \section{}
-In which we answer question 2
+
+X will advertise the prefixes 1.2.0.0/16 and 5.6.7.0/24 to both B and C. The reason it advertises only those prefixes to B and C is that it only wants to receieve traffic destined for hosts on X and doesn't want to be responsible for routing traffic destined for other ASes.
 \section{}
-In which we answer question three
+
+\subsection{a)}
+In the worst case, each node in the network forwards a packet, and each of those packets that reach a particular node. Therefore the number of packets received will be $N-1$, where $N$ is the number of nodes in the graph.
+
+\subsection{b)}
+Using RPF, each node will forward a packet to each of its neighbours at most once. Therefore a packet receives at most one packet from each of its neighbours, so the the maximum number of packets a node can receive is equal to the number of neighbours it has.
+
+\subsection{c)}
+Using a spanning tree, each packet has exactly one direct path from the source to each other node in the graph. Therefore each node will receive a packet at most once. 
+
 \end{document}
