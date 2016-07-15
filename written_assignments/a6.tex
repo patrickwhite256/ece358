@@ -11,7 +11,10 @@
 \title{ECE358 S'16 Assignment 6}
 \maketitle
 \section{}
-In which we answer question 1
+The packet takes the path $A\rightarrow R_1 \rightarrow R_4 \rightarrow R_5 \rightarrow R_6 \rightarrow B$.
+Most of the routing is trivial to explain except from $R_1$.
+$R_1$ knows that $B$ is reachable both from the ASs that are adjacent to its AS, but the route to the gateway to the $R_4$ AS is shorter.
+Therefore, $R_1$ forwards the packet to $R_4$, even though it results in a longer overall path than if it had routed it to $R_3$.
 \section{}
 In which we answer question 2
 \section{}
