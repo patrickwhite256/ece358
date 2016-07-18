@@ -3,13 +3,13 @@
 # Yiqing Huang, 2016/06/17
 
 INCLUDE =
-CC = gcc
+CC = g++
 CFLAGS = -I$(INCLUDE) -Wall -g  -D_BSD_SOURCE
-LD = gcc
+LD = g++ 
 LDFLAGS = -lpthread
 LDLIBS = 
 
-NET_SRCS = net_util.c ucp.c rcs.c 
+NET_SRCS = net_util.c ucp.c rcs_demo.c 
 MAIN_SRCS = tcp-server.c tcp-client.c rcsapp-server.c rcsapp-client.c
 SRCS = $(NET_SRCS) $(MAIN_SRCS) 
 
