@@ -47,6 +47,5 @@ int rcsSend(int sockfd, void *buf, int len)
 }
 
 int rcsClose(int sockfd) {
-    close_rcs_sock(sockfd);
-    return 0;
+    return close_rcs_sock(sockfd);
 }

@@ -13,7 +13,12 @@ int create_rcs_sock() {
     return id;
 }
 
-void close_rcs_sock(int sockfd) {
-    ucpClose(g_rcs_sockets.find(sockfd)->second.ucp_sockfd);
-    g_rcs_sockets.erase(sockfd);
+int close_rcs_sock(int sockfd) {
+    int result = ucpClose(g_rcs_sockets.find(sockfd)->second.ucp_sockfd);
+
+    if (result == 0) {
+        g_rcs_sockets.erase(sockfd);
+    }
+
+    return result;
 }
