@@ -22,3 +22,7 @@ int close_rcs_sock(int sockfd) {
 
     return result;
 }
+
+RCSSocket get_rcs_sock(int sockfd) {
+    return g_rcs_sockets.find(sockfd)->second;
+}

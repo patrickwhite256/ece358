@@ -11,14 +11,15 @@ int rcsSocket() {
     return create_rcs_sock();
 }
 
-int rcsBind(int sockfd, struct sockaddr_in *addr)
-{
-	return -1;
+int rcsBind(int sockfd, struct sockaddr_in *addr) {
+    RCSSocket rcs_sock = get_rcs_sock(sockfd);
+    return(ucpBind(rcs_sock.ucp_sockfd, addr));
 }
 
-int rcsGetSockName(int sockfd, struct sockaddr_in *addr)
-{
-	return -1;
+int rcsGetSockName(int sockfd, struct sockaddr_in *addr) {
+    RCSSocket rcs_sock = get_rcs_sock(sockfd);
+
+    return ucpGetSockName(rcs_sock.ucp_sockfd, addr);
 }
 
 int rcsListen(int sockfd)

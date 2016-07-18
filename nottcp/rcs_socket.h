@@ -15,5 +15,6 @@ std::map<int, RCSSocket> g_rcs_sockets;
 
 int create_rcs_sock();
 int close_rcs_sock(int sockfd);
+RCSSocket get_rcs_sock(int sockfd);
 
 #endif
