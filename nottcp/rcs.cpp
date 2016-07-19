@@ -6,18 +6,32 @@
 #include "ucp.h"
 
 #include "rcs_socket.h"
+#include "rcs_exception.h"
 
 int rcsSocket() {
     return create_rcs_sock();
 }
 
 int rcsBind(int sockfd, struct sockaddr_in *addr) {
-    RCSSocket rcs_sock = get_rcs_sock(sockfd);
+    RCSSocket rcs_sock;
+
+    try {
+        rcs_sock = get_rcs_sock(sockfd);
+    } catch (RCSException e) {
+        return 1;
+    }
+
     return(ucpBind(rcs_sock.ucp_sockfd, addr));
 }
 
 int rcsGetSockName(int sockfd, struct sockaddr_in *addr) {
-    RCSSocket rcs_sock = get_rcs_sock(sockfd);
+    RCSSocket rcs_sock;
+
+    try {
+        rcs_sock = get_rcs_sock(sockfd);
+    } catch (RCSException e) {
+        return 1;
+    }
 
     return ucpGetSockName(rcs_sock.ucp_sockfd, addr);
 }
@@ -48,5 +62,9 @@ int rcsSend(int sockfd, void *buf, int len)
 }
 
 int rcsClose(int sockfd) {
-    return close_rcs_sock(sockfd);
+    try {
+        return close_rcs_sock(sockfd);
+    } catch (RCSException e) {
+        return 1;
+    }
 }

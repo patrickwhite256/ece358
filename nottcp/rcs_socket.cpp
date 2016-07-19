@@ -1,5 +1,6 @@
 #include "ucp.h"
 #include "rcs_socket.h"
+#include "rcs_exception.h"
 
 int RCSSocket::g_rcs_sock_counter = 0;
 
@@ -26,5 +27,11 @@ int close_rcs_sock(int sockfd) {
 }
 
 RCSSocket get_rcs_sock(int sockfd) {
-    return RCSSocket::g_rcs_sockets.find(sockfd)->second;
+    std::map<int, RCSSocket>::iterator sockiter = RCSSocket::g_rcs_sockets.find(sockfd);
+
+    if (sockiter == RCSSocket::g_rcs_sockets.end()) {
+        throw RCSException(UNDEFINED_SOCKFD);
+    }
+
+    return sockiter->second;
 }

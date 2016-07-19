@@ -10,7 +10,14 @@ struct RCSSocket {
     int id;
     int ucp_sockfd;
 
+    RCSSocket() {}
     RCSSocket(int sockfd) : ucp_sockfd(sockfd) {}
+};
+
+struct RCSSocketException {
+    int err_code;
+
+    RCSSocketException(int err_code) : err_code(err_code) {}
 };
 
 int create_rcs_sock();
