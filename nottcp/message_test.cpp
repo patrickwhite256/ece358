@@ -6,7 +6,7 @@
 #include "message.h"
 
 int main(int argc, char* argv[]) {
-    Message m("This is some test content", 26, (char)FLAG_ACK);
+    Message m("This is some test content", 26, FLAG_ACK);
 
     m.set_header();
     m.set_checksum();

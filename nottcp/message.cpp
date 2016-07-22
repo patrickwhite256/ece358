@@ -3,11 +3,11 @@
 
 #include "message.h"
 
-Message::Message(const char *msg_content, uint16_t content_size, uint8_t flags) {
+Message::Message(const char *msg_content, uint16_t content_size, uint8_t msg_flags) {
     content = new char[content_size];
     std::cout << "constructing with content " << msg_content << std::endl;
     memcpy(content, msg_content, content_size);
-    flags = flags;
+    flags = msg_flags;
     size = HEADER_SIZE + content_size;
     header = NULL;
 }
@@ -69,7 +69,7 @@ void Message::set_checksum() {
     }
 
     while(checksum_accumulator > 0xffff) {
-        checksum_accumulator = checksum_accumulator >> 16 + checksum_accumulator & 0xffff;
+        checksum_accumulator = (checksum_accumulator >> 16) + (checksum_accumulator & 0xffff);
     }
     checksum = ~checksum_accumulator;
 
