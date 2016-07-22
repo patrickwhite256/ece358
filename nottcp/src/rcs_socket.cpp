@@ -2,7 +2,10 @@
 #include "rcs_socket.h"
 #include "rcs_exception.h"
 
+using namespace std;
+
 int RCSSocket::g_rcs_sock_counter = 0;
+map<int, RCSSocket> RCSSocket::g_rcs_sockets;
 
 int create_rcs_sock() {
     RCSSocket rcs_sock(ucpSocket());
@@ -11,7 +14,7 @@ int create_rcs_sock() {
     RCSSocket::g_rcs_sock_counter++;
 
     rcs_sock.id = id;
-    RCSSocket::g_rcs_sockets.insert(std::pair<int, RCSSocket>(id, rcs_sock));
+    RCSSocket::g_rcs_sockets.insert(pair<int, RCSSocket>(id, rcs_sock));
 
     return id;
 }
@@ -27,7 +30,7 @@ int close_rcs_sock(int sockfd) {
 }
 
 RCSSocket get_rcs_sock(int sockfd) {
-    std::map<int, RCSSocket>::iterator sockiter = RCSSocket::g_rcs_sockets.find(sockfd);
+    map<int, RCSSocket>::iterator sockiter = RCSSocket::g_rcs_sockets.find(sockfd);
 
     if (sockiter == RCSSocket::g_rcs_sockets.end()) {
         throw RCSException(UNDEFINED_SOCKFD);
