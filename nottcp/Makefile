@@ -4,9 +4,9 @@
 
 INCLUDE =
 CC = g++
-CFLAGS = -I$(INCLUDE) -Wall -g  -D_BSD_SOURCE
+CFLAGS = -I$(INCLUDE) -Wall -g  -D_BSD_SOURCE -std=c++11
 LD = g++ 
-LDFLAGS = -lpthread
+LDFLAGS = -lpthread -std=c++11
 LDLIBS = 
 
 NET_SRCS = net_util.c ucp.c rcs_demo.c 
@@ -46,10 +46,10 @@ rcsapp-client: $(OBJS_RCS_C)
 message-test: $(OBJS_MSG_TEST)
 	$(LD) -o $@ $^ $(LDLIBS) $(LDFLAGS)
 
-%.o: %.c 
+%.o: %.cpp
 	$(CC) $(CFLAGS) -c $< 
 
-%.d: %.c
+%.d: %.cpp
 	g++ $(CFLAGS) -MM -MF $@ $<
 
 -include $(SRCS:.c=.d)

@@ -3,7 +3,7 @@
 
 #include "message.h"
 
-Message::Message(char *msg_content, unsigned short content_size, char flags) {
+Message::Message(const char *msg_content, uint16_t content_size, uint8_t flags) {
     content = new char[content_size];
     std::cout << "constructing with content " << msg_content << std::endl;
     memcpy(content, msg_content, content_size);
@@ -12,7 +12,7 @@ Message::Message(char *msg_content, unsigned short content_size, char flags) {
     header = NULL;
 }
 
-unsigned short Message::get_content_size() {
+uint16_t Message::get_content_size() {
     return size - HEADER_SIZE;
 }
 
@@ -28,12 +28,12 @@ void Message::set_header() {
 
     header = new char[HEADER_SIZE];
 
-    for (int i = CHECKSUM_OFFSET; i < CHECKSUM_SIZE; ++i) {
+    for (uint8_t i = CHECKSUM_OFFSET; i < CHECKSUM_SIZE; ++i) {
         header[i] = (char)0;
     }
 
     header[SIZE_OFFSET] = size >> 8;
-    header[SIZE_OFFSET + 1] = size - (header[SIZE_OFFSET] << 8);
+    header[SIZE_OFFSET + 1] = size & 0xff;
 
     header[FLAGS_OFFSET] = flags;
 }
@@ -50,33 +50,34 @@ void Message::set_checksum() {
         return;
     }
 
-    unsigned short padding_size = 16 - (size % 16);
-    unsigned short padded_size = size + padding_size;
-    char *checksum_buf = new char[padded_size];
+    uint16_t padding_size = size % 2;
+    uint16_t padded_size = size + padding_size;
+    uint8_t *checksum_buf = new uint8_t[padded_size];
 
     memcpy(checksum_buf, header, HEADER_SIZE);
     memcpy(&checksum_buf[HEADER_SIZE], content, get_content_size());
 
-    for (int i = get_content_size(); i < padded_size; ++i) {
+    for (uint16_t i = size; i < padded_size; ++i) {
         checksum_buf[i] = 0;
     }
 
-    unsigned int checksum_accumulator = 0;
+    uint32_t checksum_accumulator = 0;
 
-    for (unsigned short i = 0; i < padded_size; i += 16) {
-        unsigned short chunk = (checksum_buf[i] << 8) + checksum_buf[i+1];
+    for (uint16_t i = 0; i < padded_size; i += 2) {
+        uint16_t chunk = (checksum_buf[i] << 8) + checksum_buf[i+1];
         checksum_accumulator += chunk;
     }
 
-    unsigned short remainder = checksum_accumulator % 65535;
-    checksum = ~((unsigned short)checksum_accumulator + remainder);
+    while(checksum_accumulator > 0xffff) {
+        checksum_accumulator = checksum_accumulator >> 16 + checksum_accumulator & 0xffff;
+    }
+    checksum = ~checksum_accumulator;
 
     std::cout << "checksum " << checksum << std::endl;
 
     header[CHECKSUM_OFFSET] = (checksum >> 8);
-    header[CHECKSUM_OFFSET + 1] = checksum - ((unsigned short)header[CHECKSUM_OFFSET] << 8);
-    std::cout << ((unsigned short)header[CHECKSUM_OFFSET] << 8) << std::endl;
-    std::cout << "First byte of checksum " << (unsigned short)header[CHECKSUM_OFFSET] << " second byte of checksum " << (unsigned short)header[CHECKSUM_OFFSET + 1] << std::endl;
+    header[CHECKSUM_OFFSET + 1] = checksum & 0xff;
+    std::cout << "First byte of checksum " << +(uint8_t)header[CHECKSUM_OFFSET] << " second byte of checksum " << +(uint8_t)header[CHECKSUM_OFFSET + 1] << std::endl;
 
     delete[] checksum_buf;
 }
@@ -108,25 +109,25 @@ char *Message::serialize() {
  *  Returns true if the message is intact, false if corrupt.
  */
 bool Message::validate() {
-    unsigned short padding_size = 16 - (size % 16);
-    unsigned short padded_size = size + padding_size;
-    char *buf = new char[padded_size];
+    uint16_t padding_size = size % 2;
+    uint16_t padded_size = size + padding_size;
+    uint8_t *buf = new uint8_t[padded_size];
 
     memcpy(buf, header, HEADER_SIZE);
     memcpy(&buf[HEADER_SIZE], content, get_content_size());
 
-    for (int i = get_content_size(); i < padded_size; ++i) {
+    for (uint16_t i = size; i < padded_size; ++i) {
         buf[i] = 0;
     }
 
-    unsigned short checksum_accumulator = 0;
+    uint32_t checksum_accumulator = 0;
 
-    for (unsigned short i = 0; i < padded_size; i += 16) {
-        unsigned short chunk = (buf[i] << 8) + buf[i+1];
+    for (uint16_t i = 0; i < padded_size; i += 2) {
+        uint16_t chunk = (buf[i] << 8) + buf[i+1];
         checksum_accumulator += chunk;
     }
 
-    unsigned short complement = ~checksum_accumulator;
+    uint32_t complement = ~checksum_accumulator;
     return complement == 0;
 }
 
@@ -134,16 +135,16 @@ bool Message::validate() {
  * deserialize - Message
  *  Accepts a character buf and decomposes it into a Message object
  */
-Message deserialize(char *buf) {
-    unsigned short checksum = (buf[CHECKSUM_OFFSET] << 8) + buf[CHECKSUM_OFFSET + 1];
+Message deserialize(const char *buf) {
+    uint16_t checksum = (buf[CHECKSUM_OFFSET] << 8) + buf[CHECKSUM_OFFSET + 1];
     std::cout << "Checksum: " << checksum << std::endl;
-    char flags = buf[FLAGS_OFFSET];
-    std::cout << "Flags: " << (int)flags << std::endl;
-    unsigned short size = (buf[SIZE_OFFSET << 8]) + buf[SIZE_OFFSET + 1];
+    uint8_t flags = buf[FLAGS_OFFSET];
+    std::cout << "Flags: " << +flags << std::endl;
+    uint16_t size = (buf[SIZE_OFFSET << 8]) + buf[SIZE_OFFSET + 1];
     std::cout << "Size: " << size << std::endl;
 
     char *content;
-    unsigned short content_size = size - HEADER_SIZE;
+    uint16_t content_size = size - HEADER_SIZE;
 
     content = new char[content_size];
     memcpy(content, &buf[HEADER_SIZE], content_size);

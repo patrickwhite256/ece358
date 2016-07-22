@@ -24,6 +24,7 @@ int main(int argc, char* argv[]) {
                  " Decoded content: " << decoded.content << std::endl;
 
     delete[] serialized;
+    std::cout << "Decoded message checksum: " << decoded.checksum;
 
     assert(decoded.validate());
 }

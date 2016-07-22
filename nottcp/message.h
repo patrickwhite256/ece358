@@ -11,8 +11,10 @@
 #define HEADER_SIZE (CHECKSUM_SIZE + SIZE_SIZE + FLAGS_SIZE)
 
 #define CHECKSUM_OFFSET 0
-#define SIZE_OFFSET     2
-#define FLAGS_OFFSET    4
+#define SIZE_OFFSET     (CHECKSUM_OFFSET + CHECKSUM_SIZE)
+#define FLAGS_OFFSET    (SIZE_OFFSET     + SIZE_SIZE)
+
+#include <cstdint>
 
 
 /**
@@ -27,21 +29,21 @@
  */
 
 struct Message {
-    unsigned short checksum;
-    char flags;
+    uint16_t checksum;
+    uint8_t flags;
     char *header;
     char *content;
-    unsigned short size;
+    uint16_t size;
 
-    Message(char *msg_content, unsigned short content_size, char flags);
+    Message(const char *msg_content, uint16_t content_size, uint8_t flags);
 
-    unsigned short get_content_size();
+    uint16_t get_content_size();
     void set_header();
     void set_checksum();
     char *serialize();
     bool validate();
 };
 
-Message deserialize(char *buf);
+Message deserialize(const char *buf);
 
 #endif
