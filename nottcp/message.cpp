@@ -1,11 +1,15 @@
 #include <cstring>
+#include <iostream>
+
 #include "message.h"
 
 Message::Message(char *msg_content, unsigned short content_size, char flags) {
     content = new char[content_size];
+    std::cout << "constructing with content " << msg_content << std::endl;
     memcpy(content, msg_content, content_size);
     flags = flags;
     size = HEADER_SIZE + content_size;
+    header = NULL;
 }
 
 unsigned short Message::get_content_size() {
@@ -18,17 +22,20 @@ unsigned short Message::get_content_size() {
  */
 
 void Message::set_header() {
-    header = new char[HEADER_SIZE];
-    unsigned short content_size = get_content_size();
+    if (NULL != header) {
+        delete[] header;
+    }
 
-    for (int i = 0; i < CHECKSUM_SIZE; ++i) {
+    header = new char[HEADER_SIZE];
+
+    for (int i = CHECKSUM_OFFSET; i < CHECKSUM_SIZE; ++i) {
         header[i] = (char)0;
     }
 
-    header[CHECKSUM_SIZE] = content_size >> 8;
-    header[CHECKSUM_SIZE + 1] = content_size - (content_size >> 8);
+    header[SIZE_OFFSET] = size >> 8;
+    header[SIZE_OFFSET + 1] = size - (header[SIZE_OFFSET] << 8);
 
-    header[CHECKSUM_SIZE + SIZE_SIZE] = flags;
+    header[FLAGS_OFFSET] = flags;
 }
 
 /**
@@ -39,12 +46,20 @@ void Message::set_header() {
  */
 
 void Message::set_checksum() {
+    if (NULL == header) {
+        return;
+    }
+
     unsigned short padding_size = 16 - (size % 16);
     unsigned short padded_size = size + padding_size;
     char *checksum_buf = new char[padded_size];
 
     memcpy(checksum_buf, header, HEADER_SIZE);
-    memcpy(&checksum_buf[HEADER_SIZE + 1], content, get_content_size());
+    memcpy(&checksum_buf[HEADER_SIZE], content, get_content_size());
+
+    for (int i = get_content_size(); i < padded_size; ++i) {
+        checksum_buf[i] = 0;
+    }
 
     unsigned int checksum_accumulator = 0;
 
@@ -56,8 +71,12 @@ void Message::set_checksum() {
     unsigned short remainder = checksum_accumulator % 65535;
     checksum = ~((unsigned short)checksum_accumulator + remainder);
 
-    header[0] = (checksum >> 8);
-    header[1] = checksum - (checksum >> 8);
+    std::cout << "checksum " << checksum << std::endl;
+
+    header[CHECKSUM_OFFSET] = (checksum >> 8);
+    header[CHECKSUM_OFFSET + 1] = checksum - ((unsigned short)header[CHECKSUM_OFFSET] << 8);
+    std::cout << ((unsigned short)header[CHECKSUM_OFFSET] << 8) << std::endl;
+    std::cout << "First byte of checksum " << (unsigned short)header[CHECKSUM_OFFSET] << " second byte of checksum " << (unsigned short)header[CHECKSUM_OFFSET + 1] << std::endl;
 
     delete[] checksum_buf;
 }
@@ -72,8 +91,12 @@ char *Message::serialize() {
     char *buf = new char[size];
 
     set_header();
+    set_checksum();
     memcpy(buf, header, HEADER_SIZE);
-    memcpy(&buf[HEADER_SIZE + 1], content, get_content_size());
+
+    std::cout << get_content_size() << std::endl;
+    std::cout << "writing content " << content << std::endl;
+    memcpy(&buf[HEADER_SIZE], content, get_content_size());
 
     return buf;
 }
@@ -90,7 +113,11 @@ bool Message::validate() {
     char *buf = new char[padded_size];
 
     memcpy(buf, header, HEADER_SIZE);
-    memcpy(&buf[HEADER_SIZE + 1], content, get_content_size());
+    memcpy(&buf[HEADER_SIZE], content, get_content_size());
+
+    for (int i = get_content_size(); i < padded_size; ++i) {
+        buf[i] = 0;
+    }
 
     unsigned short checksum_accumulator = 0;
 
@@ -108,6 +135,24 @@ bool Message::validate() {
  *  Accepts a character buf and decomposes it into a Message object
  */
 Message deserialize(char *buf) {
+    unsigned short checksum = (buf[CHECKSUM_OFFSET] << 8) + buf[CHECKSUM_OFFSET + 1];
+    std::cout << "Checksum: " << checksum << std::endl;
+    char flags = buf[FLAGS_OFFSET];
+    std::cout << "Flags: " << (int)flags << std::endl;
+    unsigned short size = (buf[SIZE_OFFSET << 8]) + buf[SIZE_OFFSET + 1];
+    std::cout << "Size: " << size << std::endl;
 
+    char *content;
+    unsigned short content_size = size - HEADER_SIZE;
+
+    content = new char[content_size];
+    memcpy(content, &buf[HEADER_SIZE], content_size);
+
+    Message ret(content, content_size, flags);
+    ret.checksum = checksum;
+
+    delete[] content;
+
+    return ret;
 }
 

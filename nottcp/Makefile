@@ -12,6 +12,8 @@ LDLIBS =
 NET_SRCS = net_util.c ucp.c rcs_demo.c 
 MAIN_SRCS = tcp-server.c tcp-client.c rcsapp-server.c rcsapp-client.c
 SRCS = $(NET_SRCS) $(MAIN_SRCS) 
+MSG = message.cpp
+MSG_TEST = message_test.cpp
 
 OBJS_LIB = net_util.o
 OBJS_RCS = ucp.o rcs.o
@@ -19,6 +21,7 @@ OBJS_TCP_S = $(OBJS_LIB) tcp-server.o
 OBJS_TCP_C = $(OBJS_LIB) tcp-client.o
 OBJS_RCS_S = $(OBJS_LIB) $(OBJS_RCS) rcsapp-server.o
 OBJS_RCS_C = $(OBJS_LIB) $(OBJS_RCS) rcsapp-client.o
+OBJS_MSG_TEST = message.o message_test.o
 
 TARGETS = rcsapp-server rcsapp-client tcp-server tcp-client 
 
@@ -39,6 +42,9 @@ rcsapp-server: $(OBJS_RCS_S)
 
 rcsapp-client: $(OBJS_RCS_C) 
 	$(LD) -o $@ $^ $(LDLIBS) $(LDFLAGS) 
+
+message-test: $(OBJS_MSG_TEST)
+	$(LD) -o $@ $^ $(LDLIBS) $(LDFLAGS)
 
 %.o: %.c 
 	$(CC) $(CFLAGS) -c $< 

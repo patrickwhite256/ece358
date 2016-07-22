@@ -10,6 +10,11 @@
 
 #define HEADER_SIZE (CHECKSUM_SIZE + SIZE_SIZE + FLAGS_SIZE)
 
+#define CHECKSUM_OFFSET 0
+#define SIZE_OFFSET     2
+#define FLAGS_OFFSET    4
+
+
 /**
  * HEADER STRUCTURE
  *  -------------------------
