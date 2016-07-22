@@ -113,6 +113,10 @@ bool Message::validate() {
     uint16_t padded_size = size + padding_size;
     uint8_t *buf = new uint8_t[padded_size];
 
+    set_header();
+    header[CHECKSUM_OFFSET] = checksum >> 8;
+    header[CHECKSUM_OFFSET + 1] = checksum & 0xff;
+
     memcpy(buf, header, HEADER_SIZE);
     memcpy(&buf[HEADER_SIZE], content, get_content_size());
 
@@ -127,7 +131,11 @@ bool Message::validate() {
         checksum_accumulator += chunk;
     }
 
-    uint32_t complement = ~checksum_accumulator;
+    while(checksum_accumulator > 0xffff) {
+        checksum_accumulator = (checksum_accumulator >> 16) + (checksum_accumulator & 0xffff);
+    }
+
+    uint32_t complement = ~checksum_accumulator & 0xffff;
     return complement == 0;
 }
 
@@ -140,7 +148,7 @@ Message deserialize(const char *buf) {
     std::cout << "Checksum: " << checksum << std::endl;
     uint8_t flags = buf[FLAGS_OFFSET];
     std::cout << "Flags: " << +flags << std::endl;
-    uint16_t size = (buf[SIZE_OFFSET << 8]) + buf[SIZE_OFFSET + 1];
+    uint16_t size = (buf[SIZE_OFFSET] << 8) + buf[SIZE_OFFSET + 1];
     std::cout << "Size: " << size << std::endl;
 
     char *content;

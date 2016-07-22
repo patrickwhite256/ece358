@@ -15,8 +15,6 @@ int main(int argc, char* argv[]) {
 
     std::cout << "Message checksum: " << m.checksum << " Message size: " << m.size << std::endl;
 
-    std::cout << "buf " << &serialized[HEADER_SIZE] << std::endl;
-
     Message decoded = deserialize(serialized);
 
     std::cout << "Decoded message checksum: " << decoded.checksum <<
@@ -24,7 +22,6 @@ int main(int argc, char* argv[]) {
                  " Decoded content: " << decoded.content << std::endl;
 
     delete[] serialized;
-    std::cout << "Decoded message checksum: " << decoded.checksum;
 
     assert(decoded.validate());
 }
