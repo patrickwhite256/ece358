@@ -9,9 +9,10 @@ struct RCSSocket {
 
     int id;
     int ucp_sockfd;
+    bool is_listening;
 
-    RCSSocket() {}
-    RCSSocket(int sockfd) : ucp_sockfd(sockfd) {}
+    RCSSocket() : is_listening(false) {}
+    RCSSocket(int sockfd) : ucp_sockfd(sockfd), is_listening(false) {}
 };
 
 struct RCSSocketException {

@@ -2,6 +2,8 @@
  * @brief: ECE358 RCS API interface dummy implementation
  *
  */
+#include "errno.h"
+
 #include "rcs.h"
 #include "ucp.h"
 
@@ -18,7 +20,8 @@ int rcsBind(int sockfd, struct sockaddr_in *addr) {
     try {
         rcs_sock = get_rcs_sock(sockfd);
     } catch (RCSException e) {
-        return 1;
+        //set errno
+        return -1;
     }
 
     return(ucpBind(rcs_sock.ucp_sockfd, addr));
@@ -30,20 +33,46 @@ int rcsGetSockName(int sockfd, struct sockaddr_in *addr) {
     try {
         rcs_sock = get_rcs_sock(sockfd);
     } catch (RCSException e) {
-        return 1;
+        //set errno
+        return -1;
     }
 
     return ucpGetSockName(rcs_sock.ucp_sockfd, addr);
 }
 
-int rcsListen(int sockfd)
-{
-	return -1;
+int rcsListen(int sockfd) {
+    RCSSocket rcs_sock;
+
+    try {
+        rcs_sock = get_rcs_sock(sockfd);
+    } catch (RCSException e) {
+        //set errno
+        return -1;
+    }
+
+    rcs_sock.is_listening = true;
+
+    return 0;
 }
 
-int rcsAccept(int sockfd, struct sockaddr_in *addr)
-{
-	return -1;
+int rcsAccept(int sockfd, struct sockaddr_in *addr) {
+    RCSSocket rcs_sock;
+
+    try {
+        rcs_sock = get_rcs_sock(sockfd);
+    } catch (RCSException e) {
+        //set errno
+        return -1;
+    }
+
+    if (!rcs_sock.is_listening) {
+        //set errno
+        return -1;
+    }
+
+    // receive a connection initiation message
+    // create a socket bound to the connected sockaddr
+    // fill sockaddr inormation into addr and then return the new sockfd
 }
 
 int rcsConnect(int sockfd, const struct sockaddr_in *addr)
@@ -65,6 +94,6 @@ int rcsClose(int sockfd) {
     try {
         return close_rcs_sock(sockfd);
     } catch (RCSException e) {
-        return 1;
+        return -1;
     }
 }
