@@ -1,8 +1,9 @@
 #ifndef MESSAGE_H
 #define MESSAGE_H
 
-#define FLAG_ACK 1 // 0000 0001 -- acknowledgement of a message
-#define FLAG_CON 2 // 0000 0010 -- connection request
+#define FLAG_ACK 0x01 // 0000 0001 -- acknowledgement of a message
+#define FLAG_SYN 0x02 // 0000 0010 -- synchronize request
+#define FLAG_SQN 0x80 // 1000 0000 -- sequence number
 
 #define CHECKSUM_SIZE   2 // 16 bits
 #define SIZE_SIZE       2 // 16 bits
