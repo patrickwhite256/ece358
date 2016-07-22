@@ -31,7 +31,7 @@
 struct Message {
     uint16_t checksum;
     uint8_t flags;
-    char *header;
+    uint8_t *header;
     char *content;
     uint16_t size;
 

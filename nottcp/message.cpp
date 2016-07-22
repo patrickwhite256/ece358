@@ -5,7 +5,6 @@
 
 Message::Message(const char *msg_content, uint16_t content_size, uint8_t msg_flags) {
     content = new char[content_size];
-    std::cout << "constructing with content " << msg_content << std::endl;
     memcpy(content, msg_content, content_size);
     flags = msg_flags;
     size = HEADER_SIZE + content_size;
@@ -26,7 +25,7 @@ void Message::set_header() {
         delete[] header;
     }
 
-    header = new char[HEADER_SIZE];
+    header = new uint8_t[HEADER_SIZE];
 
     for (uint8_t i = CHECKSUM_OFFSET; i < CHECKSUM_SIZE; ++i) {
         header[i] = (char)0;
@@ -73,11 +72,8 @@ void Message::set_checksum() {
     }
     checksum = ~checksum_accumulator;
 
-    std::cout << "checksum " << checksum << std::endl;
-
     header[CHECKSUM_OFFSET] = (checksum >> 8);
     header[CHECKSUM_OFFSET + 1] = checksum & 0xff;
-    std::cout << "First byte of checksum " << +(uint8_t)header[CHECKSUM_OFFSET] << " second byte of checksum " << +(uint8_t)header[CHECKSUM_OFFSET + 1] << std::endl;
 
     delete[] checksum_buf;
 }
@@ -95,8 +91,6 @@ char *Message::serialize() {
     set_checksum();
     memcpy(buf, header, HEADER_SIZE);
 
-    std::cout << get_content_size() << std::endl;
-    std::cout << "writing content " << content << std::endl;
     memcpy(&buf[HEADER_SIZE], content, get_content_size());
 
     return buf;
@@ -116,7 +110,6 @@ bool Message::validate() {
     set_header();
     header[CHECKSUM_OFFSET] = checksum >> 8;
     header[CHECKSUM_OFFSET + 1] = checksum & 0xff;
-
     memcpy(buf, header, HEADER_SIZE);
     memcpy(&buf[HEADER_SIZE], content, get_content_size());
 
@@ -145,11 +138,8 @@ bool Message::validate() {
  */
 Message deserialize(const char *buf) {
     uint16_t checksum = (buf[CHECKSUM_OFFSET] << 8) + buf[CHECKSUM_OFFSET + 1];
-    std::cout << "Checksum: " << checksum << std::endl;
     uint8_t flags = buf[FLAGS_OFFSET];
-    std::cout << "Flags: " << +flags << std::endl;
     uint16_t size = (buf[SIZE_OFFSET] << 8) + buf[SIZE_OFFSET + 1];
-    std::cout << "Size: " << size << std::endl;
 
     char *content;
     uint16_t content_size = size - HEADER_SIZE;

@@ -8,9 +8,6 @@
 int main(int argc, char* argv[]) {
     Message m("This is some test content", 26, FLAG_ACK);
 
-    m.set_header();
-    m.set_checksum();
-
     char *serialized = m.serialize();
 
     std::cout << "Message checksum: " << m.checksum << " Message size: " << m.size << std::endl;
