@@ -22,6 +22,7 @@ struct RCSSocketException {
 };
 
 int create_rcs_sock();
+int create_bound_rcs_sock(int sockfd);
 int close_rcs_sock(int sockfd);
 RCSSocket get_rcs_sock(int sockfd);
 
