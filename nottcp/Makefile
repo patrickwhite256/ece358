@@ -1,59 +1,57 @@
-# Makefile
-# ECE358 Computer Networks
-# Yiqing Huang, 2016/06/17
+CXX=g++
+DEBUG ?= -DDEBUG
+CXXFLAGS= -g -Wall $(DEBUG) -std=c++11
+LDFLAGS = -pthread
+EXECS=message-test rcsapp-client rcsapp-server
+BIN_DIR=bin
 
-INCLUDE =
-CC = g++
-CFLAGS = -I$(INCLUDE) -Wall -g  -D_BSD_SOURCE -std=c++11
-LD = g++ 
-LDFLAGS = -lpthread -std=c++11
-LDLIBS = 
+_EXECS=$(patsubst %,$(BIN_DIR)/%, $(EXECS))
+_SRCS=$(wildcard src/*.cpp)
+_FAKE_OBJECTS=build/rcsapp-client.o build/rcsapp-server.o build/ucp.o
+_REAL_OBJECTS=$(patsubst src/%.cpp,build/%.o, $(_SRCS))
 
-NET_SRCS = net_util.c ucp.c rcs_demo.c 
-MAIN_SRCS = tcp-server.c tcp-client.c rcsapp-server.c rcsapp-client.c
-SRCS = $(NET_SRCS) $(MAIN_SRCS) 
-MSG = message.cpp
-MSG_TEST = message_test.cpp
+UCP_OBJS=build/ucp.o build/net_util.o
+RCS_OBJS=build/rcs.o build/rcs_socket.o build/message.o
 
-OBJS_LIB = net_util.o
-OBJS_RCS = ucp.o rcs.o
-OBJS_TCP_S = $(OBJS_LIB) tcp-server.o
-OBJS_TCP_C = $(OBJS_LIB) tcp-client.o
-OBJS_RCS_S = $(OBJS_LIB) $(OBJS_RCS) rcsapp-server.o
-OBJS_RCS_C = $(OBJS_LIB) $(OBJS_RCS) rcsapp-client.o
-OBJS_MSG_TEST = message.o message_test.o
+.PHONY: all clean test rcsapp
 
-TARGETS = rcsapp-server rcsapp-client tcp-server tcp-client 
+all: $(BIN_DIR) $(_EXECS)
 
-all: rcsapp tcpapp 
+# test:
+# 	tests/run_tests.sh
 
-rcsapp: rcsapp-server rcsapp-client
-
-tcpapp: tcp-server tcp-client
-
-tcp-server: $(OBJS_TCP_S) 
-	$(LD) -o $@ $^ $(LDLIBS) $(LDFLAGS) 
-
-tcp-client: $(OBJS_TCP_C) 
-	$(LD) -o $@ $^ $(LDLIBS) $(LDFLAGS) 
-
-rcsapp-server: $(OBJS_RCS_S) 
-	$(LD) -o $@ $^ $(LDLIBS) $(LDFLAGS) 
-
-rcsapp-client: $(OBJS_RCS_C) 
-	$(LD) -o $@ $^ $(LDLIBS) $(LDFLAGS) 
-
-message-test: $(OBJS_MSG_TEST)
-	$(LD) -o $@ $^ $(LDLIBS) $(LDFLAGS)
-
-%.o: %.cpp
-	$(CC) $(CFLAGS) -c $< 
-
-%.d: %.cpp
-	g++ $(CFLAGS) -MM -MF $@ $<
-
--include $(SRCS:.c=.d)
-
-.PHONY: clean
 clean:
-	rm -f *.d *.o *.a $(TARGETS) 
+	rm -rf $(BIN_DIR) build/*
+
+rcsapp: bin/rcsapp-client bin/rcsapp-server
+	cp $^ .
+
+$(BIN_DIR):
+	mkdir -p $(BIN_DIR)
+
+$(_REAL_OBJECTS): build/%.o: src/%.cpp
+	$(CXX) $(CXXFLAGS) $^ -c -o $@
+
+$(_FAKE_OBJECTS): build/%.o: %.c rcs.h
+	$(CXX) $(CXXFLAGS) $< -c -o $@
+
+rcs.h: src/rcs.h
+	cp $^ .
+
+build/%.d: src/%.cpp
+	$(CXX) $(CXXFLAGS) -MM -MF $@ $<
+
+-include $(_SRCS:src/%.cpp=build/%.d)
+
+####################################################################
+########################     EXECS     #############################
+####################################################################
+
+$(BIN_DIR)/message-test: build/message.o build/message_test.o
+	$(CXX) $(CXXFLAGS) $(LDFLAGS) $^ -o $@
+
+$(BIN_DIR)/rcsapp-client: build/rcsapp-client.o $(UCP_OBJS) $(RCS_OBJS)
+	$(CXX) $(CXXFLAGS) $(LDFLAGS) $^ -o $@
+
+$(BIN_DIR)/rcsapp-server: build/rcsapp-server.o $(UCP_OBJS) $(RCS_OBJS)
+	$(CXX) $(CXXFLAGS) $(LDFLAGS) $^ -o $@
