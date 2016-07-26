@@ -3,6 +3,34 @@
 
 #include "message.h"
 
+// Calculates a 16-bit 1's complement checksum over an arbitrary byte buffer
+uint16_t compute_checksum(uint8_t *buf, uint16_t size) {
+    uint16_t padding_size = size % 2;
+    uint16_t padded_size = size + padding_size;
+    uint8_t *checksum_buf = new uint8_t[padded_size];
+
+    memcpy(checksum_buf, buf, size);
+
+    for (uint16_t i = size; i < padded_size; ++i) {
+        checksum_buf[i] = 0;
+    }
+
+    uint32_t checksum_accumulator = 0;
+
+    for (uint16_t i = 0; i < padded_size; i += 2) {
+        uint16_t chunk = (checksum_buf[i] << 8) + checksum_buf[i+1];
+        checksum_accumulator += chunk;
+    }
+
+    while(checksum_accumulator > 0xffff) {
+        checksum_accumulator = (checksum_accumulator >> 16) + (checksum_accumulator & 0xffff);
+    }
+
+    delete[] checksum_buf;
+    return (uint16_t)(~checksum_accumulator & 0xffff);
+}
+
+
 Message::Message(const char *msg_content, uint16_t content_size, uint8_t msg_flags, uint8_t port_no) {
     content = new char[content_size];
     memcpy(content, msg_content, content_size);
@@ -51,33 +79,15 @@ void Message::set_checksum() {
         return;
     }
 
-    uint16_t padding_size = size % 2;
-    uint16_t padded_size = size + padding_size;
-    uint8_t *checksum_buf = new uint8_t[padded_size];
+    uint8_t *msg_buf = new uint8_t[size];
 
-    memcpy(checksum_buf, header, HEADER_SIZE);
-    memcpy(&checksum_buf[HEADER_SIZE], content, get_content_size());
+    memcpy(msg_buf, header, HEADER_SIZE);
+    memcpy(&msg_buf[HEADER_SIZE], content, get_content_size());
 
-    for (uint16_t i = size; i < padded_size; ++i) {
-        checksum_buf[i] = 0;
-    }
-
-    uint32_t checksum_accumulator = 0;
-
-    for (uint16_t i = 0; i < padded_size; i += 2) {
-        uint16_t chunk = (checksum_buf[i] << 8) + checksum_buf[i+1];
-        checksum_accumulator += chunk;
-    }
-
-    while(checksum_accumulator > 0xffff) {
-        checksum_accumulator = (checksum_accumulator >> 16) + (checksum_accumulator & 0xffff);
-    }
-    checksum = ~checksum_accumulator;
+    checksum = compute_checksum(msg_buf, size);
 
     header[CHECKSUM_OFFSET] = (checksum >> 8);
     header[CHECKSUM_OFFSET + 1] = checksum & 0xff;
-
-    delete[] checksum_buf;
 }
 
 /**
@@ -98,40 +108,24 @@ uint8_t *Message::serialize() {
     return buf;
 }
 
-
 /**
  * validate - bool
  *  Uses the current checksum value to check if this message is corrupt.
  *  Returns true if the message is intact, false if corrupt.
  */
 bool Message::validate() {
-    uint16_t padding_size = size % 2;
-    uint16_t padded_size = size + padding_size;
-    uint8_t *buf = new uint8_t[padded_size];
+    uint8_t *buf = new uint8_t[size];
 
     set_header();
     header[CHECKSUM_OFFSET] = checksum >> 8;
     header[CHECKSUM_OFFSET + 1] = checksum & 0xff;
+
     memcpy(buf, header, HEADER_SIZE);
     memcpy(&buf[HEADER_SIZE], content, get_content_size());
 
-    for (uint16_t i = size; i < padded_size; ++i) {
-        buf[i] = 0;
-    }
+    uint16_t computed_checksum = compute_checksum(buf, size);
 
-    uint32_t checksum_accumulator = 0;
-
-    for (uint16_t i = 0; i < padded_size; i += 2) {
-        uint16_t chunk = (buf[i] << 8) + buf[i+1];
-        checksum_accumulator += chunk;
-    }
-
-    while(checksum_accumulator > 0xffff) {
-        checksum_accumulator = (checksum_accumulator >> 16) + (checksum_accumulator & 0xffff);
-    }
-
-    uint32_t complement = ~checksum_accumulator & 0xffff;
-    return complement == 0;
+    return computed_checksum == 0;
 }
 
 /**
@@ -144,10 +138,8 @@ Message deserialize(const uint8_t *buf) {
     uint8_t portno = buf[PNO_OFFSET];
     uint16_t size = (buf[SIZE_OFFSET] << 8) + buf[SIZE_OFFSET + 1];
 
-    char *content;
     uint16_t content_size = size - HEADER_SIZE;
-
-    content = new char[content_size];
+    char *content = new char[content_size];
     memcpy(content, &buf[HEADER_SIZE], content_size);
 
     Message ret(content, content_size, flags, portno);
@@ -157,4 +149,3 @@ Message deserialize(const uint8_t *buf) {
 
     return ret;
 }
-
