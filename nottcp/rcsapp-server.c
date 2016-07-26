@@ -103,19 +103,20 @@ int main(int argc, char *argv[]) {
 		perror("listen"); exit(0);
 	}
 
-	memset(&a, 0, sizeof(struct sockaddr_in));
-	int asock;
-	while((asock = rcsAccept(s, (struct sockaddr_in *)&a)) > 0) {
-		int *newasock = (int *)malloc(sizeof(int));
-		*newasock = asock;
-		int err;
-		pthread_t t;
+    rcsAccept(s, (struct sockaddr_in *)&a);
+	/* memset(&a, 0, sizeof(struct sockaddr_in)); */
+	/* int asock; */
+	/* while((asock = rcsAccept(s, (struct sockaddr_in *)&a)) > 0) { */
+	/* 	int *newasock = (int *)malloc(sizeof(int)); */
+	/* 	*newasock = asock; */
+	/* 	int err; */
+	/* 	pthread_t t; */
 
-		if(err = pthread_create(&t, NULL, &serviceConnection, (void *)(newasock))) {
-			fprintf(stderr, "pthread_create(): %s\n", strerror(err));
-			exit(1);
-		}
-	}
+	/* 	if(err = pthread_create(&t, NULL, &serviceConnection, (void *)(newasock))) { */
+	/* 		fprintf(stderr, "pthread_create(): %s\n", strerror(err)); */
+	/* 		exit(1); */
+	/* 	} */
+	/* } */
 
-	return 0;
+	/* return 0; */
 }

@@ -31,12 +31,13 @@ uint16_t compute_checksum(uint8_t *buf, uint16_t size) {
 }
 
 
-Message::Message(const char *msg_content, uint16_t content_size, uint8_t msg_flags, uint8_t port_no) {
+Message::Message(const char *msg_content, uint16_t content_size, uint8_t msg_flags) {
     content = new char[content_size];
-    memcpy(content, msg_content, content_size);
+    if(msg_content != NULL) {
+        memcpy(content, msg_content, content_size);
+    }
     flags = msg_flags;
     size = HEADER_SIZE + content_size;
-    portno = port_no;
     header = NULL;
 }
 
@@ -64,7 +65,8 @@ void Message::set_header() {
     header[SIZE_OFFSET + 1] = size & 0xff;
 
     header[FLAGS_OFFSET] = flags;
-    header[PNO_OFFSET] = portno;
+    header[DPORT_OFFSET] = d_port;
+    header[SPORT_OFFSET] = s_port;
 }
 
 /**
@@ -132,18 +134,21 @@ bool Message::validate() {
  * deserialize - Message
  *  Accepts a character buf and decomposes it into a Message object
  */
-Message deserialize(const uint8_t *buf) {
+Message *deserialize(const uint8_t *buf) {
     uint16_t checksum = (buf[CHECKSUM_OFFSET] << 8) + buf[CHECKSUM_OFFSET + 1];
     uint8_t flags = buf[FLAGS_OFFSET];
-    uint8_t portno = buf[PNO_OFFSET];
+    uint8_t dport = buf[DPORT_OFFSET];
+    uint8_t sport = buf[SPORT_OFFSET];
     uint16_t size = (buf[SIZE_OFFSET] << 8) + buf[SIZE_OFFSET + 1];
 
     uint16_t content_size = size - HEADER_SIZE;
     char *content = new char[content_size];
     memcpy(content, &buf[HEADER_SIZE], content_size);
 
-    Message ret(content, content_size, flags, portno);
-    ret.checksum = checksum;
+    Message *ret = new Message(content, content_size, flags);
+    ret->d_port = dport;
+    ret->s_port = sport;
+    ret->checksum = checksum;
 
     delete[] content;
 

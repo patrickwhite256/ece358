@@ -8,15 +8,17 @@
 
 #define CHECKSUM_SIZE   2 // 16 bits
 #define SIZE_SIZE       2 // 16 bits
+#define DPORT_SIZE      1 // 8 bits
+#define SPORT_SIZE      1 // 8 bits
 #define FLAGS_SIZE      1 // 8 bits
-#define PNO_SIZE        1 // 8 bits
 
-#define HEADER_SIZE (CHECKSUM_SIZE + SIZE_SIZE + FLAGS_SIZE + PNO_SIZE)
+#define HEADER_SIZE (CHECKSUM_SIZE + SIZE_SIZE + DPORT_SIZE + SPORT_SIZE + FLAGS_SIZE)
 
 #define CHECKSUM_OFFSET 0
 #define SIZE_OFFSET     (CHECKSUM_OFFSET + CHECKSUM_SIZE)
-#define FLAGS_OFFSET    (SIZE_OFFSET     + SIZE_SIZE)
-#define PNO_OFFSET      (FLAGS_OFFSET    + FLAGS_SIZE)
+#define DPORT_OFFSET    (SIZE_OFFSET     + SIZE_SIZE)
+#define SPORT_OFFSET    (DPORT_OFFSET    + DPORT_SIZE)
+#define FLAGS_OFFSET    (SPORT_OFFSET    + SPORT_SIZE)
 
 #include <cstdint>
 
@@ -28,19 +30,22 @@
  * |-------------------------|
  * |   16-bit message size   |
  * |-------------------------|
- * | 8 flag bits | "port" #  |
+ * |  dest port  | src port  |
+ * |-------------------------|
+ * | 8 flag bits |           |
  *  -------------------------
  */
 
 struct Message {
     uint16_t checksum;
     uint8_t flags;
-    uint8_t portno;
+    uint8_t s_port = 0;
+    uint8_t d_port = 0;
     uint8_t *header;
     char *content;
     uint16_t size;
 
-    Message(const char *msg_content, uint16_t content_size, uint8_t flags, uint8_t portno);
+    Message(const char *msg_content, uint16_t content_size, uint8_t flags);
 
     uint16_t get_content_size();
     void set_header();
@@ -49,6 +54,7 @@ struct Message {
     bool validate();
 };
 
-Message deserialize(const uint8_t *buf);
+//TODO: static
+Message *deserialize(const uint8_t *buf);
 
 #endif
