@@ -2,6 +2,8 @@
  * @brief: ECE358 RCS API interface dummy implementation
  *
  */
+#include <cstring>
+
 #include "errno.h"
 
 #include "rcs.h"
@@ -113,18 +115,16 @@ int rcsAccept(int sockfd, struct sockaddr_in *addr) {
         // something to give up eventually
     }
 
-    // TODO: use create_bound_rcs_sock
-    int cxn_sockfd = create_rcs_sock();
-    struct sockaddr_in cxn;
-    if (!rcsGetSockName(rcs_sock.id, &cxn)) {
-        // error or something
-    }
+    int cxn_sockfd = create_bound_rcs_sock(rcs_sock.ucp_sockfd);
+    RCSSocket cxn = get_rcs_sock(cxn_sockfd);
 
-    if (!rcsBind(cxn_sockfd, &cxn)) {
+    struct sockaddr_in cxn_addr;
+    if (!rcsGetSockName(cxn_sockfd, &cxn_addr)) {
         // error
     }
 
-
+    cxn.cxn_addr = new sockaddr_in;
+    memcpy(cxn.cxn_addr, &cxn_addr, sizeof(struct sockaddr_in));
 
     return cxn_sockfd;
 

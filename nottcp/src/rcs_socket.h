@@ -14,7 +14,7 @@ struct RCSSocket {
 
     RCSSocket() : is_listening(false), cxn_addr(NULL) {}
     RCSSocket(int sockfd) : ucp_sockfd(sockfd), is_listening(false), cxn_addr(NULL) {}
-    ~RCSSocket() { delete cxn_addr; }
+    ~RCSSocket() { if (cxn_addr) delete cxn_addr; }
 };
 
 struct RCSSocketException {
