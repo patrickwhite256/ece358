@@ -54,7 +54,7 @@ int rcsListen(int sockfd) {
         return -1;
     }
 
-    rcs_sock.is_listening = true;
+    rcs_sock.state = RCS_STATE_LISTENING;
 
     return 0;
 }
@@ -69,7 +69,7 @@ int rcsAccept(int sockfd, struct sockaddr_in *addr) {
         return -1;
     }
 
-    if (!rcs_sock.is_listening) {
+    if (rcs_sock.state != RCS_STATE_LISTENING) {
         //set errno
         return -1;
     }
@@ -132,7 +132,20 @@ int rcsAccept(int sockfd, struct sockaddr_in *addr) {
 
 int rcsConnect(int sockfd, const struct sockaddr_in *addr)
 {
-	return -1;
+    RCSSocket rcs_sock;
+
+    try {
+        rcs_sock = get_rcs_sock(sockfd);
+    } catch (RCSException e) {
+        //set errno
+        return -1;
+    }
+
+    Message syn(NULL, 0, FLAG_SYN, 0); //TODO: rcs port
+    const uint8_t *syn_buf = syn.serialize();
+    try_ucp_sendto(rcs_sock.ucp_sockfd, (const void *)syn_buf, syn.size, addr);
+    rcs_sock.state = RCS_STATE_SYN_SENT;
+
 }
 
 int rcsRecv(int sockfd, void *buf, int len)
