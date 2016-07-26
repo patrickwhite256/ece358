@@ -38,3 +38,26 @@ RCSSocket get_rcs_sock(int sockfd) {
 
     return sockiter->second;
 }
+
+void RCSSocket::send(Message &msg) {
+    const uint8_t *msg_buf = msg.serialize();
+    int b_sent = ucpSendTo(ucp_sockfd, msg_buf, msg.size, cxn_addr);
+    if(b_sent != msg.size) {
+        // we screwed up, try again
+    }
+    delete[] msg_buf;
+}
+
+Message RCSSocket::recv() {
+    unsigned char header_buf[HEADER_SIZE];
+    int b_recv = ucpRecvFrom(ucp_sockfd, header_buf, HEADER_SIZE, cxn_addr);
+    if(b_recv != HEADER_SIZE) {
+        // corrupt
+    }
+    // deserialize header
+    // validate_header
+    // get body
+    // check seq#
+    // validate_body
+    // return message
+}

@@ -1,6 +1,9 @@
 #ifndef RCS_SOCKET
 #define RCS_SOCKET
 
+#include "ucp.h"
+#include "message.h"
+
 #include <map>
 #include <netinet/in.h>
 
@@ -22,6 +25,9 @@ struct RCSSocket {
     RCSSocket() : state(RCS_STATE_NEW), cxn_addr(NULL) {}
     RCSSocket(int sockfd) : ucp_sockfd(sockfd), state(RCS_STATE_NEW), cxn_addr(NULL) {}
     ~RCSSocket() { if (cxn_addr) delete cxn_addr; }
+
+    void send(Message &msg);
+    Message recv(void);
 };
 
 struct RCSSocketException {
