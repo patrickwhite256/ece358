@@ -9,5 +9,6 @@ struct RCSException {
 
 // Error types
 #define UNDEFINED_SOCKFD 1
+#define UNEXPECTED_MSG   2
 
 #endif

@@ -10,9 +10,11 @@ struct RCSSocket {
     int id;
     int ucp_sockfd;
     bool is_listening;
+    sockaddr_in *cxn_addr;
 
-    RCSSocket() : is_listening(false) {}
-    RCSSocket(int sockfd) : ucp_sockfd(sockfd), is_listening(false) {}
+    RCSSocket() : is_listening(false), cxn_addr(NULL) {}
+    RCSSocket(int sockfd) : ucp_sockfd(sockfd), is_listening(false), cxn_addr(NULL) {}
+    ~RCSSocket() { delete cxn_addr; }
 };
 
 struct RCSSocketException {
