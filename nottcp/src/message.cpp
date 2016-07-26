@@ -5,7 +5,9 @@
 
 Message::Message(const char *msg_content, uint16_t content_size, uint8_t msg_flags, uint8_t port_no) {
     content = new char[content_size];
-    memcpy(content, msg_content, content_size);
+    if(msg_content != NULL) {
+        memcpy(content, msg_content, content_size);
+    }
     flags = msg_flags;
     size = HEADER_SIZE + content_size;
     portno = port_no;
