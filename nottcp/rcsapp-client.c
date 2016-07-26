@@ -69,15 +69,15 @@ int main(int argc, char *argv[]) {
 		perror("connect"); exit(1);
 	}
 
-	while((nread = read(STDIN_FILENO, buf, 256)) > 0) {
-		if(rcsSend(s, buf, nread) < 0) {
-			perror("send"); exit(1);
-		}
+/* 	while((nread = read(STDIN_FILENO, buf, 256)) > 0) { */
+/* 		if(rcsSend(s, buf, nread) < 0) { */
+/* 			perror("send"); exit(1); */
+/* 		} */
 
-		sleep(getrand()%7);
-	}
+/* 		sleep(getrand()%7); */
+/* 	} */
 
-	rcsClose(s);
+/* 	rcsClose(s); */
 
-	return 0;
+/* 	return 0; */
 }

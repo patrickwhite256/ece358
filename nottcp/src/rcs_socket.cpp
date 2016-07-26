@@ -2,6 +2,13 @@
 #include "rcs_socket.h"
 #include "rcs_exception.h"
 
+#include <cstring>
+#include <iostream>
+
+#include <netinet/in.h>
+#include <netinet/ip.h>
+#include <arpa/inet.h>
+
 using namespace std;
 
 int RCSSocket::g_rcs_sock_counter = 0;
@@ -43,7 +50,9 @@ int RCSSocket::create() {
 RCSSocket *RCSSocket::create_bound() {
     RCSSocket *rcs_sock = new RCSSocket(ucp_sockfd);
 
+    memcpy(rcs_sock->cxn_addr, cxn_addr, sizeof(struct sockaddr_in));
     rcs_sock->assign_sockfd();
+    rcs_sock->remote_port = remote_port;
 
     return rcs_sock;
 }
@@ -79,6 +88,10 @@ RCSSocket *RCSSocket::get(int sockfd) {
 }
 
 void RCSSocket::send(Message &msg) {
+    msg.s_port = id;
+    msg.d_port = remote_port;
+    cout << "sending message. source port: " << +msg.s_port << endl;
+    cout << "                 dest port:   " << +msg.d_port << endl;
     const uint8_t *msg_buf = msg.serialize();
     int b_sent = ucpSendTo(ucp_sockfd, msg_buf, msg.size, cxn_addr);
     if(b_sent != msg.size) {
@@ -88,15 +101,31 @@ void RCSSocket::send(Message &msg) {
 }
 
 Message *RCSSocket::recv() {
-    unsigned char header_buf[HEADER_SIZE];
-    int b_recv = ucpRecvFrom(ucp_sockfd, header_buf, HEADER_SIZE, cxn_addr);
-    if(b_recv != HEADER_SIZE) {
-        // corrupt
+    if(!messages.empty()) {
+        Message *msg = messages.front();
+        messages.pop();
+        return msg;
     }
-    // deserialize header
-    // validate_header
-    // get body
-    // check seq#
-    // validate_body
-    // return message
+    while(true) { // until we receive a message meant for this socket
+        unsigned char msg_buf[MAX_UCP_PACKET_SIZE];
+        int b_recv;
+        if(state == RCS_STATE_LISTENING) {
+            b_recv = ucpRecvFrom(ucp_sockfd, msg_buf, HEADER_SIZE, cxn_addr);
+        } else {
+            b_recv = ucpRecvFrom(ucp_sockfd, msg_buf, HEADER_SIZE, NULL);
+        }
+        Message *msg = deserialize(msg_buf);
+        msg->validate();
+        cout << "received message. source port: " << +msg->s_port << endl;
+        cout << "                  dest port:   " << +msg->d_port << endl;
+        if(state != RCS_STATE_LISTENING && msg->d_port != this->id){
+            RCSSocket *recipient = RCSSocket::get(msg->d_port);
+            //TODO: maybe invalid
+            recipient->messages.push(msg);
+            continue;
+        }
+        remote_port = msg->s_port;
+        // check seq#
+        return msg;
+    }
 }

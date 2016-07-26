@@ -4,6 +4,7 @@
 #include "ucp.h"
 #include "message.h"
 
+#include <queue>
 #include <map>
 #include <netinet/in.h>
 
@@ -13,18 +14,26 @@
 #define RCS_STATE_SYN_RECV    3
 #define RCS_STATE_ESTABLISHED 4
 
+#define MAX_UCP_PACKET_SIZE 1000
+
 struct RCSSocket {
     static int g_rcs_sock_counter;
     static std::map<int, RCSSocket *> g_rcs_sockets;
 
     int id;
     int ucp_sockfd;
+    int remote_port;
     uint8_t state;
     sockaddr_in *cxn_addr;
+    std::queue<Message *> messages;
 
-    RCSSocket() : state(RCS_STATE_NEW), cxn_addr(NULL) {}
-    RCSSocket(int sockfd) : ucp_sockfd(sockfd), state(RCS_STATE_NEW), cxn_addr(NULL) {}
-    ~RCSSocket() { if (cxn_addr) delete cxn_addr; }
+    RCSSocket() : state(RCS_STATE_NEW) {
+        cxn_addr = new sockaddr_in;
+    }
+    RCSSocket(int sockfd) : ucp_sockfd(sockfd), state(RCS_STATE_NEW) {
+        cxn_addr = new sockaddr_in;
+    }
+    ~RCSSocket() { delete cxn_addr; }
 
     void send(Message &msg);
     Message *recv(void);
