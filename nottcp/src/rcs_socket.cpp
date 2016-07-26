@@ -5,45 +5,47 @@
 using namespace std;
 
 int RCSSocket::g_rcs_sock_counter = 0;
-map<int, RCSSocket> RCSSocket::g_rcs_sockets;
+map<int, RCSSocket *> RCSSocket::g_rcs_sockets;
 
 /**
- * assign_rcs_sockfd - void
- *  assigns a new unique id to the provided RCSSocket and adds it to the gloal map.
+ * assign_sockfd - void
+ *  assigns a new unique id to the RCSSocket and adds it to the gloal map.
  *  this id is used as the file descriptor for the conceptual rcs socket associated
  *  with this RCSSocket data structure.
  */
-void assign_rcs_sockfd(RCSSocket &sock) {
+void RCSSocket::assign_sockfd() {
     int id = RCSSocket::g_rcs_sock_counter;
     RCSSocket::g_rcs_sock_counter++;
 
-    sock.id = id;
-    RCSSocket::g_rcs_sockets.insert(pair<int, RCSSocket>(id, sock));
+    this->id = id;
+    g_rcs_sockets.insert(pair<int, RCSSocket *>(id, this));
 }
 
 
 /**
- * create_rcs_sock - RCSSocket
+ * create - int
  *  creates a RCS socket bound to a newly-created UCP socket
+ *  return the rcs sockfd of the new socket.
  */
-int create_rcs_sock() {
-    RCSSocket rcs_sock(ucpSocket());
+int RCSSocket::create() {
+    RCSSocket *rcs_sock = new RCSSocket(ucpSocket());
 
-    assign_rcs_sockfd(rcs_sock);
+    rcs_sock->assign_sockfd();
 
-    return rcs_sock.id;
+    return rcs_sock->id;
 }
 
 /**
- * create_bound_rcs_sock - RCSSocket
- *  creates a RCS socket bound to an existing UCP socket with the given sockfd
+ * create_bound - RCSSocket *
+ *  creates a RCS socket bound to the same UCP socket.
+ *  return the new socket
  */
-int create_bound_rcs_sock(int sockfd) {
-    RCSSocket rcs_sock(sockfd);
+RCSSocket *RCSSocket::create_bound() {
+    RCSSocket *rcs_sock = new RCSSocket(ucp_sockfd);
 
-    assign_rcs_sockfd(rcs_sock);
+    rcs_sock->assign_sockfd();
 
-    return rcs_sock.id;
+    return rcs_sock;
 }
 
 /**
@@ -51,22 +53,23 @@ int create_bound_rcs_sock(int sockfd) {
  *  closes an RCS socket and the underlying UCP socket
  *  returns 0 on success
  */
-int close_rcs_sock(int sockfd) {
-    int result = ucpClose(RCSSocket::g_rcs_sockets.find(sockfd)->second.ucp_sockfd);
+int RCSSocket::close() {
+    // TODO: don't close ucp sockfd unless this is the listener
+    int result = ucpClose(ucp_sockfd);
 
     if (result == 0) {
-        RCSSocket::g_rcs_sockets.erase(sockfd);
+        RCSSocket::g_rcs_sockets.erase(this->id);
     }
 
     return result;
 }
 
 /**
- * get_rcs_sock - RCSSocket
+ * get - RCSSocket *
  *  returns the RCSSocket data structure associated with the provided sockfd
  */
-RCSSocket get_rcs_sock(int sockfd) {
-    map<int, RCSSocket>::iterator sockiter = RCSSocket::g_rcs_sockets.find(sockfd);
+RCSSocket *RCSSocket::get(int sockfd) {
+    auto sockiter = RCSSocket::g_rcs_sockets.find(sockfd);
 
     if (sockiter == RCSSocket::g_rcs_sockets.end()) {
         throw RCSException(UNDEFINED_SOCKFD);
@@ -84,7 +87,7 @@ void RCSSocket::send(Message &msg) {
     delete[] msg_buf;
 }
 
-Message RCSSocket::recv() {
+Message *RCSSocket::recv() {
     unsigned char header_buf[HEADER_SIZE];
     int b_recv = ucpRecvFrom(ucp_sockfd, header_buf, HEADER_SIZE, cxn_addr);
     if(b_recv != HEADER_SIZE) {

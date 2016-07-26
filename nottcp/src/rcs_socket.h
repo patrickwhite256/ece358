@@ -15,7 +15,7 @@
 
 struct RCSSocket {
     static int g_rcs_sock_counter;
-    static std::map<int, RCSSocket> g_rcs_sockets;
+    static std::map<int, RCSSocket *> g_rcs_sockets;
 
     int id;
     int ucp_sockfd;
@@ -27,18 +27,22 @@ struct RCSSocket {
     ~RCSSocket() { if (cxn_addr) delete cxn_addr; }
 
     void send(Message &msg);
-    Message recv(void);
+    Message *recv(void);
+
+    void assign_sockfd();
+    RCSSocket *create_bound();
+    int close();
+
+    static int create();
+    static RCSSocket *get(int sockfd);
 };
+
+// TODO: destroy all sockets
 
 struct RCSSocketException {
     int err_code;
 
     RCSSocketException(int err_code) : err_code(err_code) {}
 };
-
-int create_rcs_sock();
-int create_bound_rcs_sock(int sockfd);
-int close_rcs_sock(int sockfd);
-RCSSocket get_rcs_sock(int sockfd);
 
 #endif
