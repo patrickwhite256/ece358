@@ -9,6 +9,8 @@
 
 #include "rcs_socket.h"
 #include "rcs_exception.h"
+#include "message.h"
+#include "tryhard_ucp.h"
 
 int rcsSocket() {
     return create_rcs_sock();
@@ -70,9 +72,62 @@ int rcsAccept(int sockfd, struct sockaddr_in *addr) {
         return -1;
     }
 
-    // receive a connection initiation message
-    // create a socket bound to the connected sockaddr
-    // fill sockaddr inormation into addr and then return the new sockfd
+    bool got_syn = false;
+
+    while (!got_syn) {
+        uint8_t *buf = new uint8_t[HEADER_SIZE];
+        try_ucp_recvfrom(rcs_sock.ucp_sockfd, (void *)buf, HEADER_SIZE, addr, 0);
+
+        Message syn_msg = deserialize(buf);
+
+        if (syn_msg.validate()          &&
+            (syn_msg.flags & FLAG_SYN)  &&
+            !(syn_msg.flags & FLAG_SQN)) {
+
+            got_syn = true;
+        }
+
+        // something to give up eventually
+    }
+
+    Message syn_ack(new char[0], 0, FLAG_SYN | FLAG_ACK, addr->sin_port);
+    const uint8_t *syn_ack_buf = syn_ack.serialize();
+    try_ucp_sendto(rcs_sock.ucp_sockfd, (const void *)syn_ack_buf, syn_ack.size, addr, 1, 0);
+    delete[] syn_ack_buf;
+
+    bool got_ack = false;
+
+    while (!got_ack) {
+        uint8_t *buf = new uint8_t[HEADER_SIZE];
+        try_ucp_recvfrom(rcs_sock.ucp_sockfd, (void *)buf, HEADER_SIZE, addr, 0);
+
+        Message syn_msg = deserialize(buf);
+
+        if (syn_msg.validate()          &&
+            (syn_msg.flags & FLAG_ACK)  &&
+            (syn_msg.flags & FLAG_SQN)) {
+
+            got_ack = true;
+        }
+
+        // something to give up eventually
+    }
+
+    // TODO: use create_bound_rcs_sock
+    int cxn_sockfd = create_rcs_sock();
+    struct sockaddr_in cxn;
+    if (!rcsGetSockName(rcs_sock.id, &cxn)) {
+        // error or something
+    }
+
+    if (!rcsBind(cxn_sockfd, &cxn)) {
+        // error
+    }
+
+
+
+    return cxn_sockfd;
+
 }
 
 int rcsConnect(int sockfd, const struct sockaddr_in *addr)
