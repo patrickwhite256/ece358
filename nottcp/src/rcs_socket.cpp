@@ -13,7 +13,7 @@ map<int, RCSSocket> RCSSocket::g_rcs_sockets;
  *  this id is used as the file descriptor for the conceptual rcs socket associated
  *  with this RCSSocket data structure.
  */
-void assign_rcs_sockfd(RCSSocket sock) {
+void assign_rcs_sockfd(RCSSocket &sock) {
     int id = RCSSocket::g_rcs_sock_counter;
     RCSSocket::g_rcs_sock_counter++;
 
