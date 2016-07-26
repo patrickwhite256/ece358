@@ -54,7 +54,7 @@ int rcsListen(int sockfd) {
         return -1;
     }
 
-    rcs_sock.is_listening = true;
+    rcs_sock.state = RCS_STATE_LISTENING;
 
     return 0;
 }
@@ -69,45 +69,33 @@ int rcsAccept(int sockfd, struct sockaddr_in *addr) {
         return -1;
     }
 
-    if (!rcs_sock.is_listening) {
+    if (rcs_sock.state != RCS_STATE_LISTENING) {
         //set errno
         return -1;
     }
 
+    // TODO: create new rcs socket bound to same addr
+
     bool got_syn = false;
 
     while (!got_syn) {
-        uint8_t *buf = new uint8_t[HEADER_SIZE];
-        try_ucp_recvfrom(rcs_sock.ucp_sockfd, (void *)buf, HEADER_SIZE, addr, 0);
-
-        Message syn_msg = deserialize(buf);
-
-        if (syn_msg.validate()          &&
-            (syn_msg.flags & FLAG_SYN)  &&
-            !(syn_msg.flags & FLAG_SQN)) {
-
+        Message syn_msg = rcs_sock.recv();
+        if (syn_msg.flags & FLAG_SYN) {
             got_syn = true;
         }
 
         // something to give up eventually
     }
 
-    Message syn_ack(new char[0], 0, FLAG_SYN | FLAG_ACK, addr->sin_port);
-    const uint8_t *syn_ack_buf = syn_ack.serialize();
-    try_ucp_sendto(rcs_sock.ucp_sockfd, (const void *)syn_ack_buf, syn_ack.size, addr, 1, 0);
-    delete[] syn_ack_buf;
+    Message syn_ack(new char[0], 0, FLAG_SYN | FLAG_ACK, 0); //TODO: rcs port
+    rcs_sock.send(syn_ack);
 
     bool got_ack = false;
 
     while (!got_ack) {
-        uint8_t *buf = new uint8_t[HEADER_SIZE];
-        try_ucp_recvfrom(rcs_sock.ucp_sockfd, (void *)buf, HEADER_SIZE, addr, 0);
+        Message syn_msg = rcs_sock.recv();
 
-        Message syn_msg = deserialize(buf);
-
-        if (syn_msg.validate()          &&
-            (syn_msg.flags & FLAG_ACK)  &&
-            (syn_msg.flags & FLAG_SQN)) {
+        if (syn_msg.flags & FLAG_ACK) {
 
             got_ack = true;
         }
@@ -130,9 +118,20 @@ int rcsAccept(int sockfd, struct sockaddr_in *addr) {
 
 }
 
-int rcsConnect(int sockfd, const struct sockaddr_in *addr)
-{
-	return -1;
+int rcsConnect(int sockfd, const struct sockaddr_in *addr) {
+    RCSSocket rcs_sock;
+
+    try {
+        rcs_sock = get_rcs_sock(sockfd);
+    } catch (RCSException e) {
+        //set errno
+        return -1;
+    }
+
+    Message syn(NULL, 0, FLAG_SYN, 0); //TODO: rcs port
+    rcs_sock.send(syn);
+    rcs_sock.state = RCS_STATE_SYN_SENT;
+
 }
 
 int rcsRecv(int sockfd, void *buf, int len)
