@@ -94,15 +94,15 @@ RCSSocket *RCSSocket::get(int sockfd) {
 
 void RCSSocket::send_ack() {
     Message *ack = new Message(NULL, 0, FLAG_ACK);
+    ack->s_port = id;
+    ack->d_port = remote_port;
+    ack->set_akn(recv_seq_n);
+    int b_sent = 0;
+    uint8_t *ack_buf = ack->serialize();
     cout << "sending ack.     size:        " << +ack->size << endl;
     cout << "                 source port: " << +ack->s_port << endl;
     cout << "                 dest port:   " << +ack->d_port << endl;
     cout << "                 sequence #:  " << +(ack->flags & FLAG_SQN) << endl;
-    ack->s_port = id;
-    ack->d_port = remote_port;
-    if(ack->flags & FLAG_SQN) ack->flags ^= FLAG_AKN;
-    int b_sent = 0;
-    uint8_t *ack_buf = ack->serialize();
     while(b_sent != ack->size) {
         b_sent = ucpSendTo(ucp_sockfd, ack_buf, ack->size, cxn_addr);
     }
@@ -127,8 +127,7 @@ int RCSSocket::flush_send_q() {
 
         msg->s_port = id;
         msg->d_port = remote_port;
-        msg->flags ^= send_seq_n;
-
+        msg->set_sqn(send_seq_n);
 
         cout << "sending message. size:        " << +msg->size << endl;
         cout << "                 source port: " << +msg->s_port << endl;
@@ -146,7 +145,7 @@ int RCSSocket::flush_send_q() {
 
         sent += msg->get_content_size();
 
-        send_seq_n ^= FLAG_SQN;
+        send_seq_n = !send_seq_n;
         send_q.pop_front();
         delete msg;
     }
@@ -207,8 +206,8 @@ void RCSSocket::recv_ack() {
         msg = get_msg();
         if(msg->is_ack()) {
             // must be in order ack
-            assert((msg->flags & FLAG_AKN) == send_seq_n);
-        } else if((msg->flags & FLAG_SQN) == recv_seq_n) { // in order data packet
+            assert(msg->get_akn() == send_seq_n);
+        } else if(msg->get_sqn() == recv_seq_n) { // in order data packet
             messages.push_back(msg); //requeue
             continue;
         } else { // out of order data packet
@@ -234,10 +233,10 @@ Message *RCSSocket::recv(bool no_ack) {
         msg = get_msg();
         if(msg->is_ack()) {
             // out of order ack. ignore, get new.
-            assert((msg->flags & FLAG_AKN) != send_seq_n);
+            assert(msg->get_akn() != send_seq_n);
             delete msg;
             continue; // get new packet
-        } else if ((msg->flags & FLAG_SQN) != recv_seq_n) {
+        } else if (msg->get_sqn() != recv_seq_n) {
             // out of order data
             resend_ack(); // resend ack
             delete msg;
@@ -250,7 +249,7 @@ Message *RCSSocket::recv(bool no_ack) {
     if(!no_ack) {
         send_ack();
     }
-    recv_seq_n ^= FLAG_ACK;
+    recv_seq_n = !recv_seq_n;
 
     return msg;
 }

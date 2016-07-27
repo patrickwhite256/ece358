@@ -81,7 +81,7 @@ int rcsAccept(int sockfd, struct sockaddr_in *addr) {
     while(true) {
         Message *syn_msg = listen_sock->recv(true);
         memcpy(addr, listen_sock->cxn_addr, sizeof(sockaddr_in));
-        if (syn_msg->flags & FLAG_SYN) {
+        if (syn_msg->is_syn()) {
             delete syn_msg;
             break;
         }
@@ -89,7 +89,7 @@ int rcsAccept(int sockfd, struct sockaddr_in *addr) {
     }
 
     RCSSocket *rcs_sock = listen_sock->create_bound();
-    rcs_sock->recv_seq_n = FLAG_SQN;
+    rcs_sock->recv_seq_n = 1;
 
     Message *syn_ack = new Message(new char[0], 0, FLAG_SYN | FLAG_ACK);
     rcs_sock->send_q.push_back(syn_ack);
@@ -118,7 +118,7 @@ int rcsConnect(int sockfd, const struct sockaddr_in *addr) {
     rcs_sock->state = RCS_STATE_SYN_SENT;
 
     Message *syn_ack = rcs_sock->recv();
-    if (syn_ack->flags & FLAG_SYN) {
+    if (syn_ack->is_syn()) {
         delete syn_ack;
     } else {
         assert(false);
