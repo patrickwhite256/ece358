@@ -4,7 +4,7 @@
 #include "ucp.h"
 #include "message.h"
 
-#include <queue>
+#include <deque>
 #include <map>
 #include <netinet/in.h>
 
@@ -25,7 +25,12 @@ struct RCSSocket {
     int remote_port;
     uint8_t state;
     sockaddr_in *cxn_addr;
-    std::queue<Message *> messages;
+    std::deque<Message *> messages;
+    std::deque<Message *> send_q;
+    Message *last_ack = NULL;
+
+    uint8_t send_seq_n = 0;
+    uint8_t recv_seq_n = 0;
 
     RCSSocket() : state(RCS_STATE_NEW) {
         cxn_addr = new sockaddr_in;
@@ -35,8 +40,11 @@ struct RCSSocket {
     }
     ~RCSSocket() { delete cxn_addr; }
 
-    void send(Message &msg);
-    Message *recv(void);
+    void send_ack();
+    void recv_ack();
+    void resend_ack();
+    void flush_send_q();
+    Message *recv(bool no_ack = false);
 
     void assign_sockfd();
     RCSSocket *create_bound();

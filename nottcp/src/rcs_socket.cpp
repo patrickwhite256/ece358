@@ -3,6 +3,7 @@
 #include "rcs_exception.h"
 
 #include <cstring>
+#include <cassert>
 #include <iostream>
 
 #include <netinet/in.h>
@@ -87,45 +88,129 @@ RCSSocket *RCSSocket::get(int sockfd) {
     return sockiter->second;
 }
 
-void RCSSocket::send(Message &msg) {
-    msg.s_port = id;
-    msg.d_port = remote_port;
-    cout << "sending message. source port: " << +msg.s_port << endl;
-    cout << "                 dest port:   " << +msg.d_port << endl;
-    const uint8_t *msg_buf = msg.serialize();
-    int b_sent = ucpSendTo(ucp_sockfd, msg_buf, msg.size, cxn_addr);
-    if(b_sent != msg.size) {
-        // we screwed up, try again
+void RCSSocket::send_ack() {
+    Message *ack = new Message(NULL, 0, FLAG_ACK);
+    ack->s_port = id;
+    ack->d_port = remote_port;
+    ack->flags ^= recv_seq_n;
+    int b_sent = 0;
+    uint8_t *ack_buf = ack->serialize();
+    while(b_sent != ack->size) {
+        b_sent = ucpSendTo(ucp_sockfd, ack_buf, ack->size, cxn_addr);
     }
-    delete[] msg_buf;
+
+    last_ack = ack;
 }
 
-Message *RCSSocket::recv() {
-    if(!messages.empty()) {
-        Message *msg = messages.front();
-        messages.pop();
-        return msg;
+void RCSSocket::resend_ack() {
+    uint8_t *ack_buf = last_ack->serialize();
+    int b_sent = 0;
+    while(b_sent != last_ack->size) {
+        b_sent = ucpSendTo(ucp_sockfd, ack_buf, last_ack->size, cxn_addr);
     }
-    while(true) { // until we receive a message meant for this socket
-        unsigned char msg_buf[MAX_UCP_PACKET_SIZE];
-        int b_recv;
-        if(state == RCS_STATE_LISTENING) {
-            b_recv = ucpRecvFrom(ucp_sockfd, msg_buf, HEADER_SIZE, cxn_addr);
-        } else {
-            b_recv = ucpRecvFrom(ucp_sockfd, msg_buf, HEADER_SIZE, NULL);
-        }
-        Message *msg = deserialize(msg_buf);
-        msg->validate();
-        cout << "received message. source port: " << +msg->s_port << endl;
-        cout << "                  dest port:   " << +msg->d_port << endl;
-        if(state != RCS_STATE_LISTENING && msg->d_port != this->id){
-            RCSSocket *recipient = RCSSocket::get(msg->d_port);
-            //TODO: maybe invalid
-            recipient->messages.push(msg);
+}
+
+void RCSSocket::flush_send_q() {
+    while(!send_q.empty()) {
+        Message *msg = send_q.front();
+
+        msg->s_port = id;
+        msg->d_port = remote_port;
+        msg->flags ^= send_seq_n;
+
+
+        cout << "sending message. source port: " << +msg->s_port << endl;
+        cout << "                 dest port:   " << +msg->d_port << endl;
+
+        const uint8_t *msg_buf = msg->serialize();
+        int b_sent = ucpSendTo(ucp_sockfd, msg_buf, msg->size, cxn_addr);
+        if(b_sent != msg->size) {
+            // incomplete packet sent; retry
             continue;
         }
-        remote_port = msg->s_port;
-        // check seq#
-        return msg;
+
+        while(true) { // while haven't received ack
+            // TODO: timeout
+            Message *ack = recv(true);
+            if(ack->flags & FLAG_ACK == 0) {
+                if(ack->flags & FLAG_SQN == recv_seq_n) {
+                    // received data in sequence while expecting ack;
+                    messages.push_back(ack); //queue the data
+                } else {
+                    // received data out of sequence - our ack was lost
+                    resend_ack(); // resend last ack
+                    delete ack;
+                }
+                // in both cases, continue waiting for ack
+                continue;
+            }
+            assert(ack->flags & FLAG_AKN == send_seq_n);
+            break;
+        }
+
+        send_seq_n ^= FLAG_SQN;
+        send_q.pop_front();
+        delete msg;
     }
+}
+
+void RCSSocket::recv_ack() {
+
+}
+
+Message *RCSSocket::recv(bool no_ack) {
+    Message *msg;
+    while(true) { // wait until we get an in order data segment
+        if(!messages.empty()) {
+            msg = messages.front();
+            messages.pop_front();
+        } else {
+            while(true) { // until we receive a message meant for this socket
+                unsigned char msg_buf[MAX_UCP_PACKET_SIZE];
+                int b_recv = ucpRecvFrom(ucp_sockfd, msg_buf, HEADER_SIZE, cxn_addr);
+
+                msg = deserialize(msg_buf);
+
+                cout << "received message. source port: " << +msg->s_port << endl;
+                cout << "                  dest port:   " << +msg->d_port << endl;
+
+                if(!msg->validate()) {
+                    cout << "corrupt packet. ignoring" << endl;
+                    // ignore
+                    delete msg;
+                    continue;
+                }
+
+                if(state != RCS_STATE_LISTENING && msg->d_port != this->id){
+                    // this is data for someone else
+                    RCSSocket *recipient = RCSSocket::get(msg->d_port);
+                    //TODO: maybe invalid
+                    recipient->messages.push_back(msg);
+                    continue; // get new message
+                }
+
+                break;
+            }
+        }
+        if(msg->flags & FLAG_ACK) {
+            // out of order ack. ignore, get new.
+            assert(msg->flags & FLAG_AKN != send_seq_n);
+            delete msg;
+            continue; // get new packet
+        } else if (msg->flags & FLAG_SQN != recv_seq_n) {
+            // out of order data
+            resend_ack(); // resend ack
+            delete msg;
+            continue; // get new packet
+        }
+        break; // in order data
+    }
+
+    remote_port = msg->s_port;
+    if(!no_ack) {
+        send_ack();
+    }
+    recv_seq_n ^= FLAG_ACK;
+
+    return msg;
 }
