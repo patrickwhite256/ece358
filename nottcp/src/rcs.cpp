@@ -186,9 +186,27 @@ int rcsRecv(int sockfd, void *buf, int len) {
 }
 
 int rcsSend(int sockfd, void *buf, int len) {
-    // wrap buffer in message
-    // serialize and send message buffer
-	return -1;
+    RCSSocket *rcs_sock;
+
+    try {
+        rcs_sock = RCSSocket::get(sockfd);
+    } catch (RCSException e) {
+        // set errno
+        return -1;
+    }
+
+    int max_content_size = MAX_UCP_PACKET_SIZE - HEADER_SIZE;
+
+    // The return value will be wrong if this isn't true
+    assert(rcs_sock->send_q.empty());
+
+    for (int i = 0; i < len; i += max_content_size) {
+        uint16_t msg_size = max_content_size - (len - i * max_content_size);
+        Message *msg = new Message(&((char *)buf)[i], msg_size, 0);
+        rcs_sock->send_q.push_back(msg);
+    }
+
+    return rcs_sock->flush_send_q();
 }
 
 int rcsClose(int sockfd) {

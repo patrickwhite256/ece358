@@ -114,7 +114,9 @@ void RCSSocket::resend_ack() {
     }
 }
 
-void RCSSocket::flush_send_q() {
+int RCSSocket::flush_send_q() {
+    int sent = 0;
+
     while(!send_q.empty()) {
         Message *msg = send_q.front();
 
@@ -135,11 +137,15 @@ void RCSSocket::flush_send_q() {
 
         recv_ack();
 
+        sent += msg->get_content_size();
+
         send_seq_n ^= FLAG_SQN;
         send_q.pop_front();
         delete msg;
         cout << send_q.size() << endl;
     }
+
+    return sent;
 }
 
 void RCSSocket::recv_ack() {

@@ -46,7 +46,7 @@ struct RCSSocket {
     void send_ack();
     void recv_ack();
     void resend_ack();
-    void flush_send_q();
+    int flush_send_q();
     Message *recv(bool no_ack = false);
 
     void assign_sockfd();
