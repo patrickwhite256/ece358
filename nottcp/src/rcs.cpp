@@ -5,6 +5,7 @@
 #include <cstring>
 #include <cassert>
 #include <iostream>
+#include <algorithm>
 
 #include "errno.h"
 
@@ -132,14 +133,80 @@ int rcsConnect(int sockfd, const struct sockaddr_in *addr) {
     return 0;
 }
 
-int rcsRecv(int sockfd, void *buf, int len)
-{
-	return -1;
+int rcsRecv(int sockfd, void *buf, int len) {
+    RCSSocket *rcs_sock;
+
+    try {
+        rcs_sock = RCSSocket::get(sockfd);
+    } catch (RCSException e) {
+        // set errno
+        return -1;
+    }
+
+    if (rcs_sock->data_buf_size && rcs_sock->data_buf_size <= len) {
+        // buffered data is lis less than is asked for
+        // return what's there
+        uint16_t buf_size = rcs_sock->data_buf_size;
+        memcpy(buf, rcs_sock->data_buf, buf_size);
+
+        delete[] rcs_sock->data_buf;
+        rcs_sock->data_buf = NULL;
+        rcs_sock->data_buf_size = 0;
+
+        return buf_size;
+    } else if (rcs_sock->data_buf_size > len) {
+        // there is more buffered data than what is asked for
+        // return the amount asked for and keep the rest buffered
+        memcpy(buf, rcs_sock->data_buf, len);
+
+        rcs_sock->data_buf_size -= len;
+        char *excess = new char[rcs_sock->data_buf_size];
+        memcpy(excess, &rcs_sock->data_buf[len], rcs_sock->data_buf_size);
+
+        delete rcs_sock->data_buf;
+        rcs_sock->data_buf = excess;
+
+        return len;
+    }
+
+    // no buffered data, get a new message
+    Message *msg = rcs_sock->recv();
+    memcpy(buf, msg->content, len);
+
+    if (msg->get_content_size() <= len) {
+        // return what we got if that's all there is
+        return msg->get_content_size();
+    }
+
+    // buffer any excess message content
+    rcs_sock->data_buf_size = msg->get_content_size() - len;
+    rcs_sock->data_buf =  new char[rcs_sock->data_buf_size];
+    memcpy(rcs_sock->data_buf, &(msg->content[len]), rcs_sock->data_buf_size);
+    return len;
 }
 
-int rcsSend(int sockfd, void *buf, int len)
-{
-	return -1;
+int rcsSend(int sockfd, void *buf, int len) {
+    RCSSocket *rcs_sock;
+
+    try {
+        rcs_sock = RCSSocket::get(sockfd);
+    } catch (RCSException e) {
+        // set errno
+        return -1;
+    }
+
+    int max_content_size = MAX_UCP_PACKET_SIZE - HEADER_SIZE;
+
+    // The return value will be wrong if this isn't true
+    assert(rcs_sock->send_q.empty());
+
+    for (int i = 0; i < len; i += max_content_size) {
+        uint16_t msg_size = max_content_size - (len - i * max_content_size);
+        Message *msg = new Message(&((char *)buf)[i], msg_size, 0);
+        rcs_sock->send_q.push_back(msg);
+    }
+
+    return rcs_sock->flush_send_q();
 }
 
 int rcsClose(int sockfd) {
