@@ -15,6 +15,10 @@ using namespace std;
 int RCSSocket::g_rcs_sock_counter = 0;
 map<int, RCSSocket *> RCSSocket::g_rcs_sockets;
 
+
+//HUGE TODO: if a packet is received to the wrong port it can go on the queue
+// and show up endlessly in both recv methods
+
 /**
  * assign_sockfd - void
  *  assigns a new unique id to the RCSSocket and adds it to the gloal map.
@@ -129,33 +133,75 @@ void RCSSocket::flush_send_q() {
             continue;
         }
 
-        while(true) { // while haven't received ack
-            // TODO: timeout
-            Message *ack = recv(true);
-            if(ack->flags & FLAG_ACK == 0) {
-                if(ack->flags & FLAG_SQN == recv_seq_n) {
-                    // received data in sequence while expecting ack;
-                    messages.push_back(ack); //queue the data
-                } else {
-                    // received data out of sequence - our ack was lost
-                    resend_ack(); // resend last ack
-                    delete ack;
-                }
-                // in both cases, continue waiting for ack
-                continue;
-            }
-            assert(ack->flags & FLAG_AKN == send_seq_n);
-            break;
-        }
+        recv_ack();
 
         send_seq_n ^= FLAG_SQN;
         send_q.pop_front();
         delete msg;
+        cout << send_q.size() << endl;
     }
 }
 
 void RCSSocket::recv_ack() {
+    Message *msg;
+    while(true) { // wait until we get an in order data segment
+        if(!messages.empty()) {
+            msg = messages.front();
+            messages.pop_front();
+        } else {
+            while(true) { // until we receive a message meant for this socket
+                unsigned char msg_buf[MAX_UCP_PACKET_SIZE];
+                ucpRecvFrom(ucp_sockfd, msg_buf, HEADER_SIZE, cxn_addr);
 
+                msg = deserialize(msg_buf);
+
+                cout << "received message. source port: " << +msg->s_port << endl;
+                cout << "                  dest port:   " << +msg->d_port << endl;
+
+                if(!msg->validate()) {
+                    cout << "corrupt packet. ignoring" << endl;
+                    // ignore
+                    delete msg;
+                    continue;
+                }
+
+                if(state != RCS_STATE_LISTENING && msg->d_port != this->id){
+                    // this is data for someone else
+                    RCSSocket *recipient = RCSSocket::get(msg->d_port);
+                    //TODO: maybe invalid
+                    recipient->messages.push_back(msg);
+                    continue; // get new message
+                }
+
+                break;
+            }
+        }
+        if((msg->flags & FLAG_ACK) == 0) {
+            // data packet
+            if((msg->flags & FLAG_SQN) == recv_seq_n) {
+                // in order data packet
+                messages.push_back(msg); //requeue
+            } else {
+                // out of order, resend ack
+                resend_ack();
+                delete msg;
+            }
+            continue; // get new packet
+        } else {
+            // must be in order ack
+            assert((msg->flags & FLAG_AKN) == send_seq_n);
+        }
+        break; // in order ack
+    }
+    if(msg->flags & FLAG_SYN) {
+        // requeue SYNACK as SYN
+        cout << "requeueing synack" << endl;
+        msg->flags ^= FLAG_ACK;
+        messages.push_back(msg);
+    } else {
+        delete msg;
+    }
+    cout << "recv'd ack" << endl;
 }
 
 Message *RCSSocket::recv(bool no_ack) {
@@ -167,7 +213,7 @@ Message *RCSSocket::recv(bool no_ack) {
         } else {
             while(true) { // until we receive a message meant for this socket
                 unsigned char msg_buf[MAX_UCP_PACKET_SIZE];
-                int b_recv = ucpRecvFrom(ucp_sockfd, msg_buf, HEADER_SIZE, cxn_addr);
+                ucpRecvFrom(ucp_sockfd, msg_buf, HEADER_SIZE, cxn_addr);
 
                 msg = deserialize(msg_buf);
 
@@ -194,10 +240,10 @@ Message *RCSSocket::recv(bool no_ack) {
         }
         if(msg->flags & FLAG_ACK) {
             // out of order ack. ignore, get new.
-            assert(msg->flags & FLAG_AKN != send_seq_n);
+            assert((msg->flags & FLAG_AKN) != send_seq_n);
             delete msg;
             continue; // get new packet
-        } else if (msg->flags & FLAG_SQN != recv_seq_n) {
+        } else if ((msg->flags & FLAG_SQN) != recv_seq_n) {
             // out of order data
             resend_ack(); // resend ack
             delete msg;

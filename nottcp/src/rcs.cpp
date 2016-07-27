@@ -3,6 +3,7 @@
  *
  */
 #include <cstring>
+#include <cassert>
 #include <iostream>
 
 #include "errno.h"
@@ -77,10 +78,9 @@ int rcsAccept(int sockfd, struct sockaddr_in *addr) {
     }
 
     cout << "ucp_sockfd: " << listen_sock->ucp_sockfd << endl;
-    cout << "WHAT" << endl;
 
     while(true) {
-        Message *syn_msg = listen_sock->recv();
+        Message *syn_msg = listen_sock->recv(true);
         cout << "recv" << endl;
         memcpy(addr, listen_sock->cxn_addr, sizeof(sockaddr_in));
         if (syn_msg->flags & FLAG_SYN) {
@@ -91,18 +91,12 @@ int rcsAccept(int sockfd, struct sockaddr_in *addr) {
     }
 
     RCSSocket *rcs_sock = listen_sock->create_bound();
+    rcs_sock->recv_seq_n = 1;
 
-    Message syn_ack(new char[0], 0, FLAG_SYN | FLAG_ACK);
-    rcs_sock->send(syn_ack);
+    Message *syn_ack = new Message(new char[0], 0, FLAG_SYN | FLAG_ACK);
+    rcs_sock->send_q.push_back(syn_ack);
 
-    while (true) {
-        Message *syn_msg = rcs_sock->recv();
-        if (syn_msg->flags & FLAG_ACK) {
-            delete syn_msg;
-            break;
-        }
-        delete syn_msg;
-    }
+    rcs_sock->flush_send_q(); // send SYN-ACK and wait for ACK
 
     return rcs_sock->id;
 }
@@ -117,24 +111,23 @@ int rcsConnect(int sockfd, const struct sockaddr_in *addr) {
         return -1;
     }
 
-    Message syn(NULL, 0, FLAG_SYN);
     memcpy(rcs_sock->cxn_addr, addr, sizeof(sockaddr_in));
-    rcs_sock->send(syn);
-    rcs_sock->state = RCS_STATE_SYN_SENT;
-    while (true) {
-        // give up eventually
-        Message *syn_ack_msg = rcs_sock->recv();
-        cout << "WHAT" << endl;
-        if ((syn_ack_msg->flags & FLAG_ACK) && (syn_ack_msg->flags & FLAG_SYN)) {
-            delete syn_ack_msg;
-            break;
-        }
-        delete syn_ack_msg;
-    }
 
-    Message ack(NULL, 0, FLAG_ACK);
-    rcs_sock->send(ack);
-    rcs_sock->state = RCS_STATE_ESTABLISHED;
+    // give up eventually
+    Message *syn = new Message(NULL, 0, FLAG_SYN);
+    rcs_sock->send_q.push_back(syn);
+    rcs_sock->flush_send_q();
+    rcs_sock->state = RCS_STATE_SYN_SENT;
+
+    cout << "waiting for synack" << endl;
+    cout << rcs_sock->messages.size() << endl;
+    Message *syn_ack = rcs_sock->recv();
+    if (syn_ack->flags & FLAG_SYN) {
+        delete syn_ack;
+    } else {
+        cout << "fuck" << endl;
+        assert(false);
+    }
 
     return 0;
 }
