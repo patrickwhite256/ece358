@@ -34,23 +34,21 @@ struct RCSSocket {
     uint8_t send_seq_n = 0;
     uint8_t recv_seq_n = 0;
 
-    RCSSocket() : state(RCS_STATE_NEW), data_buf_size(0) {
-        cxn_addr = new sockaddr_in;
-    }
-    RCSSocket(int sockfd) : ucp_sockfd(sockfd), state(RCS_STATE_NEW), data_buf_size(0) {
-
-        cxn_addr = new sockaddr_in;
-    }
+    RCSSocket() : state(RCS_STATE_NEW), cxn_addr(new sockaddr_in), data_buf_size(0) {}
+    RCSSocket(int sockfd) : ucp_sockfd(sockfd), state(RCS_STATE_NEW), cxn_addr(new sockaddr_in), data_buf_size(0) {}
     ~RCSSocket() { delete cxn_addr; }
+
+    int flush_send_q();
+    Message *recv(bool no_ack = false);
+
+    RCSSocket *create_bound();
 
     void send_ack();
     void recv_ack();
     void resend_ack();
-    int flush_send_q();
-    Message *recv(bool no_ack = false);
-
     void assign_sockfd();
-    RCSSocket *create_bound();
+    Message *get_msg();
+
     int close();
 
     static int create();

@@ -12,7 +12,7 @@ int main(int argc, char* argv[]) {
 
     std::cout << "Message checksum: " << m.checksum << " Message size: " << m.size << std::endl;
 
-    Message *decoded = deserialize(serialized);
+    Message *decoded = deserialize(serialized, m.size);
 
     std::cout << "Decoded message checksum: " << decoded->checksum <<
                  " Decoded message size: " << decoded->size <<
