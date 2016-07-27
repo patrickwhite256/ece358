@@ -78,11 +78,8 @@ int rcsAccept(int sockfd, struct sockaddr_in *addr) {
         return -1;
     }
 
-    cout << "ucp_sockfd: " << listen_sock->ucp_sockfd << endl;
-
     while(true) {
         Message *syn_msg = listen_sock->recv(true);
-        cout << "recv" << endl;
         memcpy(addr, listen_sock->cxn_addr, sizeof(sockaddr_in));
         if (syn_msg->flags & FLAG_SYN) {
             delete syn_msg;
@@ -92,7 +89,7 @@ int rcsAccept(int sockfd, struct sockaddr_in *addr) {
     }
 
     RCSSocket *rcs_sock = listen_sock->create_bound();
-    rcs_sock->recv_seq_n = 1;
+    rcs_sock->recv_seq_n = FLAG_SQN;
 
     Message *syn_ack = new Message(new char[0], 0, FLAG_SYN | FLAG_ACK);
     rcs_sock->send_q.push_back(syn_ack);
@@ -120,13 +117,10 @@ int rcsConnect(int sockfd, const struct sockaddr_in *addr) {
     rcs_sock->flush_send_q();
     rcs_sock->state = RCS_STATE_SYN_SENT;
 
-    cout << "waiting for synack" << endl;
-    cout << rcs_sock->messages.size() << endl;
     Message *syn_ack = rcs_sock->recv();
     if (syn_ack->flags & FLAG_SYN) {
         delete syn_ack;
     } else {
-        cout << "fuck" << endl;
         assert(false);
     }
 
@@ -201,7 +195,7 @@ int rcsSend(int sockfd, void *buf, int len) {
     assert(rcs_sock->send_q.empty());
 
     for (int i = 0; i < len; i += max_content_size) {
-        uint16_t msg_size = max_content_size - (len - i * max_content_size);
+        uint16_t msg_size = min(max_content_size, len - i * max_content_size);
         Message *msg = new Message(&((char *)buf)[i], msg_size, 0);
         rcs_sock->send_q.push_back(msg);
     }
