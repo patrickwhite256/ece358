@@ -41,6 +41,11 @@ Message::Message(const char *msg_content, uint16_t content_size, uint8_t msg_fla
     header = NULL;
 }
 
+Message::~Message() {
+    delete[] content;
+    if(header) delete[] header;
+}
+
 uint16_t Message::get_content_size() {
     return size - HEADER_SIZE;
 }
@@ -88,6 +93,8 @@ void Message::set_checksum() {
 
     checksum = compute_checksum(msg_buf, size);
 
+    delete[] msg_buf;
+
     header[CHECKSUM_OFFSET] = (checksum >> 8);
     header[CHECKSUM_OFFSET + 1] = checksum & 0xff;
 }
@@ -127,19 +134,37 @@ bool Message::validate() {
 
     uint16_t computed_checksum = compute_checksum(buf, size);
 
+    delete[] buf;
+
     return computed_checksum == 0;
+}
+
+bool Message::is_ack() {
+    return (flags & FLAG_ACK) > 0;
+}
+
+bool Message::is_syn() {
+    return (flags & FLAG_SYN) > 0;
 }
 
 /**
  * deserialize - Message
  *  Accepts a character buf and decomposes it into a Message object
+ *  May return NULL if the message is invalid.
  */
-Message *deserialize(const uint8_t *buf) {
+Message *deserialize(const uint8_t *buf, uint16_t buf_len) {
+    if(buf_len < HEADER_SIZE) {
+        return NULL;
+    }
+
     uint16_t checksum = (buf[CHECKSUM_OFFSET] << 8) + buf[CHECKSUM_OFFSET + 1];
     uint8_t flags = buf[FLAGS_OFFSET];
     uint8_t dport = buf[DPORT_OFFSET];
     uint8_t sport = buf[SPORT_OFFSET];
     uint16_t size = (buf[SIZE_OFFSET] << 8) + buf[SIZE_OFFSET + 1];
+    if(buf_len < size) {
+        return NULL;
+    }
 
     uint16_t content_size = size - HEADER_SIZE;
     char *content = new char[content_size];

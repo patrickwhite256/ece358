@@ -46,15 +46,19 @@ struct Message {
     uint16_t size;
 
     Message(const char *msg_content, uint16_t content_size, uint8_t flags);
+    ~Message();
 
     uint16_t get_content_size();
     void set_header();
     void set_checksum();
     uint8_t *serialize();
     bool validate();
+
+    bool is_ack();
+    bool is_syn();
 };
 
 //TODO: static
-Message *deserialize(const uint8_t *buf);
+Message *deserialize(const uint8_t *buf, uint16_t buf_len);
 
 #endif
