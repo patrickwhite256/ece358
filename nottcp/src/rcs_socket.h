@@ -5,6 +5,7 @@
 #include "message.h"
 
 #include <deque>
+#include <queue>
 #include <map>
 #include <netinet/in.h>
 
@@ -27,15 +28,18 @@ struct RCSSocket {
     sockaddr_in *cxn_addr;
     std::deque<Message *> messages;
     std::deque<Message *> send_q;
+    char *data_buf;
+    uint16_t data_buf_size;
     Message *last_ack = NULL;
 
     uint8_t send_seq_n = 0;
     uint8_t recv_seq_n = 0;
 
-    RCSSocket() : state(RCS_STATE_NEW) {
+    RCSSocket() : state(RCS_STATE_NEW), data_buf_size(0) {
         cxn_addr = new sockaddr_in;
     }
-    RCSSocket(int sockfd) : ucp_sockfd(sockfd), state(RCS_STATE_NEW) {
+    RCSSocket(int sockfd) : ucp_sockfd(sockfd), state(RCS_STATE_NEW), data_buf_size(0) {
+
         cxn_addr = new sockaddr_in;
     }
     ~RCSSocket() { delete cxn_addr; }
