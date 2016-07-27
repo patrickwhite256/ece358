@@ -5,7 +5,6 @@
 #include "message.h"
 
 #include <deque>
-#include <queue>
 #include <map>
 #include <netinet/in.h>
 
