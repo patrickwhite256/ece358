@@ -147,6 +147,24 @@ bool Message::is_syn() {
     return (flags & FLAG_SYN) > 0;
 }
 
+uint8_t Message::get_sqn() {
+    return (flags & FLAG_SQN) > 0;
+}
+
+uint8_t Message::get_akn() {
+    return (flags & FLAG_AKN) > 0;
+}
+
+void Message::set_sqn(uint8_t sqn) {
+    if(sqn == 1) flags |= FLAG_SQN;
+    else flags &= ~FLAG_SQN;
+}
+
+void Message::set_akn(uint8_t akn) {
+    if(akn == 1) flags |= FLAG_AKN;
+    else flags &= ~FLAG_AKN;
+}
+
 /**
  * deserialize - Message
  *  Accepts a character buf and decomposes it into a Message object

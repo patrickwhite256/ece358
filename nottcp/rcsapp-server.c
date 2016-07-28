@@ -23,7 +23,7 @@
 #include "rcs.h"
 
 #if 0
-#define _DEBUG_
+#define DEBUG
 #endif
 
 void *serviceConnection(void *arg) {
@@ -42,7 +42,7 @@ void *serviceConnection(void *arg) {
 	unsigned char buf[256];
 	ssize_t recvlen = 0;
 	while((recvlen = rcsRecv(s, buf, 256)) >= 0) {
-#ifdef _DEBUG_
+#ifdef DEBUG
 		if(recvlen > 0) {
 			printf("%lu received %d bytes.\n",
 				pthread_self(), recvlen);
@@ -51,7 +51,7 @@ void *serviceConnection(void *arg) {
 
 		if(recvlen <= 0) { 
 			// quit 
-#ifdef _DEBUG_
+#ifdef DEBUG
 			printf("%lu exiting, spot 1...\n", pthread_self());
 #endif
 			close(wfd);
@@ -67,7 +67,7 @@ void *serviceConnection(void *arg) {
 		}
 	}
 
-#ifdef _DEBUG_
+#ifdef DEBUG
 	printf("%lu exiting, spot 2...\n", pthread_self());
 #endif
 	close(wfd);
@@ -103,20 +103,20 @@ int main(int argc, char *argv[]) {
 		perror("listen"); exit(0);
 	}
 
-    rcsAccept(s, (struct sockaddr_in *)&a);
-	/* memset(&a, 0, sizeof(struct sockaddr_in)); */
-	/* int asock; */
-	/* while((asock = rcsAccept(s, (struct sockaddr_in *)&a)) > 0) { */
-	/* 	int *newasock = (int *)malloc(sizeof(int)); */
-	/* 	*newasock = asock; */
-	/* 	int err; */
-	/* 	pthread_t t; */
+	memset(&a, 0, sizeof(struct sockaddr_in));
+	int asock;
+	while((asock = rcsAccept(s, (struct sockaddr_in *)&a)) > 0) {
+		int *newasock = (int *)malloc(sizeof(int));
+		*newasock = asock;
+		int err;
+		pthread_t t;
 
-	/* 	if(err = pthread_create(&t, NULL, &serviceConnection, (void *)(newasock))) { */
-	/* 		fprintf(stderr, "pthread_create(): %s\n", strerror(err)); */
-	/* 		exit(1); */
-	/* 	} */
-	/* } */
+        serviceConnection(newasock);
+		/* if(err = pthread_create(&t, NULL, &serviceConnection, (void *)(newasock))) { */
+		/* 	fprintf(stderr, "pthread_create(): %s\n", strerror(err)); */
+		/* 	exit(1); */
+		/* } */
+	}
 
-	/* return 0; */
+	return 0;
 }

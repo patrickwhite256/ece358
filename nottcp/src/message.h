@@ -56,6 +56,10 @@ struct Message {
 
     bool is_ack();
     bool is_syn();
+    uint8_t get_sqn();
+    uint8_t get_akn();
+    void set_sqn(uint8_t sqn);
+    void set_akn(uint8_t akn);
 };
 
 //TODO: static
