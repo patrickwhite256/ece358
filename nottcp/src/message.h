@@ -22,6 +22,8 @@
 
 #include <cstdint>
 
+#include "rcs_exception.h"
+
 
 /**
  * HEADER STRUCTURE
@@ -52,7 +54,7 @@ struct Message {
     void set_header();
     void set_checksum();
     uint8_t *serialize();
-    bool validate();
+    void validate();
 
     bool is_ack();
     bool is_syn();
@@ -60,9 +62,8 @@ struct Message {
     uint8_t get_akn();
     void set_sqn(uint8_t sqn);
     void set_akn(uint8_t akn);
-};
 
-//TODO: static
-Message *deserialize(const uint8_t *buf, uint16_t buf_len);
+    static Message *deserialize(const uint8_t *buf, uint16_t buf_len);
+};
 
 #endif

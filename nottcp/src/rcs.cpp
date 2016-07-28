@@ -111,7 +111,7 @@ int rcsConnect(int sockfd, const struct sockaddr_in *addr) {
 
     memcpy(rcs_sock->cxn_addr, addr, sizeof(sockaddr_in));
 
-    // give up eventually
+    // TODO: give up eventually
     Message *syn = new Message(NULL, 0, FLAG_SYN);
     rcs_sock->send_q.push_back(syn);
     rcs_sock->flush_send_q();

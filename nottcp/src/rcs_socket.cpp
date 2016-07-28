@@ -16,9 +16,6 @@ int RCSSocket::g_rcs_sock_counter = 0;
 map<int, RCSSocket *> RCSSocket::g_rcs_sockets;
 
 
-//HUGE TODO: if a packet is received to the wrong port it can go on the queue
-// and show up endlessly in both recv methods
-
 /**
  * assign_sockfd - void
  *  assigns a new unique id to the RCSSocket and adds it to the gloal map.
@@ -86,7 +83,7 @@ RCSSocket *RCSSocket::get(int sockfd) {
     auto sockiter = RCSSocket::g_rcs_sockets.find(sockfd);
 
     if (sockiter == RCSSocket::g_rcs_sockets.end()) {
-        throw RCSException(UNDEFINED_SOCKFD);
+        throw RCSException(RCS_ERROR_UNDEFINED_SOCKFD);
     }
 
     return sockiter->second;
@@ -138,10 +135,22 @@ int RCSSocket::flush_send_q() {
         int b_sent = ucpSendTo(ucp_sockfd, msg_buf, msg->size, cxn_addr);
         if(b_sent != msg->size) {
             // incomplete packet sent; retry
+            cout << "did not send complete segment; resending" << endl;
             continue;
         }
 
-        recv_ack();
+        try {
+            recv_ack();
+        } catch(RCSException &ex) {
+            if(ex.err_code == RCS_ERROR_TIMEOUT) {
+                cout << "timeout on ack; resending." << endl;
+                continue;
+            } else if(ex.err_code == RCS_ERROR_CORRUPT) {
+                cout << "corrupt ack; resending." << endl;
+                continue;
+            }
+            assert(false);
+        }
 
         sent += msg->get_content_size();
 
@@ -153,32 +162,32 @@ int RCSSocket::flush_send_q() {
     return sent;
 }
 
-Message *RCSSocket::get_msg() {
+Message *RCSSocket::get_msg(uint16_t timeout) {
+    uint16_t timeout_left = timeout;
     while(true) {
         // clear out ucp socket, then get something from the mq
         while(true) {
             unsigned char msg_buf[MAX_UCP_PACKET_SIZE];
-            //TODO: proper timeout
-            ucpSetSockRecvTimeout(ucp_sockfd, 100);
+            ucpSetSockRecvTimeout(ucp_sockfd, UCP_TIMEOUT_STEP_MS);
             int b_recv = ucpRecvFrom(ucp_sockfd, msg_buf, MAX_UCP_PACKET_SIZE, cxn_addr);
             if(b_recv < 0 && (errno == EWOULDBLOCK || errno == EAGAIN)){
                 // no more data
                 break;
             }
 
-            Message *msg = deserialize(msg_buf, b_recv);
-            if(msg == NULL) continue;
+            Message *msg = Message::deserialize(msg_buf, b_recv);
 
             cout << "received message. size:        " << +msg->size << endl;
             cout << "                  source port: " << +msg->s_port << endl;
             cout << "                  dest port:   " << +msg->d_port << endl;
             cout << "                  sequence #:  " << +(msg->flags & FLAG_SQN) << endl;
 
-            if(!msg->validate()) {
-                cout << "corrupt packet. ignoring" << endl;
-                // ignore
+            try {
+                msg->validate();
+            } catch (RCSException &ex) {
+                assert(ex.err_code == RCS_ERROR_CORRUPT);
                 delete msg;
-                continue;
+                throw;
             }
 
             // is this data for someone else
@@ -197,13 +206,17 @@ Message *RCSSocket::get_msg() {
             messages.pop_front();
             return msg;
         }
+        if(timeout > 0) {
+            if(timeout_left < UCP_TIMEOUT_STEP_MS) throw RCSException(RCS_ERROR_TIMEOUT);
+            timeout_left -= UCP_TIMEOUT_STEP_MS;
+        }
     }
 }
 
 void RCSSocket::recv_ack() {
     Message *msg;
     while(true) { // wait until we get an in order data segment
-        msg = get_msg();
+        msg = get_msg(RESEND_TIMEOUT_MS);
         if(msg->is_ack()) {
             // must be in order ack
             assert(msg->get_akn() == send_seq_n);
@@ -230,7 +243,13 @@ void RCSSocket::recv_ack() {
 Message *RCSSocket::recv(bool no_ack) {
     Message *msg;
     while(true) { // wait until we get an in order data segment
-        msg = get_msg();
+        try {
+            msg = get_msg();
+        } catch (RCSException &ex) {
+            assert(ex.err_code == RCS_ERROR_CORRUPT);
+            cout << "received corrupt packet, discarding" << endl;
+            continue;
+        }
         if(msg->is_ack()) {
             // out of order ack. ignore, get new.
             assert(msg->get_akn() != send_seq_n);

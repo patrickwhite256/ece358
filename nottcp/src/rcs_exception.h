@@ -8,7 +8,9 @@ struct RCSException {
 };
 
 // Error types
-#define UNDEFINED_SOCKFD 1
-#define UNEXPECTED_MSG   2
+#define RCS_ERROR_UNDEFINED_SOCKFD 0
+#define RCS_ERROR_UNEXPECTED_MSG   1
+#define RCS_ERROR_TIMEOUT          2
+#define RCS_ERROR_CORRUPT          3
 
 #endif

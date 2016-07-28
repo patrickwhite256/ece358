@@ -122,7 +122,7 @@ uint8_t *Message::serialize() {
  *  Uses the current checksum value to check if this message is corrupt.
  *  Returns true if the message is intact, false if corrupt.
  */
-bool Message::validate() {
+void Message::validate() {
     uint8_t *buf = new uint8_t[size];
 
     set_header();
@@ -136,7 +136,9 @@ bool Message::validate() {
 
     delete[] buf;
 
-    return computed_checksum == 0;
+    if(computed_checksum != 0) {
+        throw RCSException(RCS_ERROR_CORRUPT);
+    }
 }
 
 bool Message::is_ack() {
@@ -168,11 +170,11 @@ void Message::set_akn(uint8_t akn) {
 /**
  * deserialize - Message
  *  Accepts a character buf and decomposes it into a Message object
- *  May return NULL if the message is invalid.
+ *  May throw RCSException if the message is invalid.
  */
-Message *deserialize(const uint8_t *buf, uint16_t buf_len) {
+Message *Message::deserialize(const uint8_t *buf, uint16_t buf_len) {
     if(buf_len < HEADER_SIZE) {
-        return NULL;
+        throw RCSException(RCS_ERROR_CORRUPT);
     }
 
     uint16_t checksum = (buf[CHECKSUM_OFFSET] << 8) + buf[CHECKSUM_OFFSET + 1];
@@ -181,7 +183,7 @@ Message *deserialize(const uint8_t *buf, uint16_t buf_len) {
     uint8_t sport = buf[SPORT_OFFSET];
     uint16_t size = (buf[SIZE_OFFSET] << 8) + buf[SIZE_OFFSET + 1];
     if(buf_len < size) {
-        return NULL;
+        throw RCSException(RCS_ERROR_CORRUPT);
     }
 
     uint16_t content_size = size - HEADER_SIZE;

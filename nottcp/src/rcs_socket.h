@@ -14,7 +14,9 @@
 #define RCS_STATE_SYN_RECV    3
 #define RCS_STATE_ESTABLISHED 4
 
+#define UCP_TIMEOUT_STEP_MS 10
 #define MAX_UCP_PACKET_SIZE 1000
+#define RESEND_TIMEOUT_MS   1000
 
 struct RCSSocket {
     static int g_rcs_sock_counter;
@@ -47,7 +49,7 @@ struct RCSSocket {
     void recv_ack();
     void resend_ack();
     void assign_sockfd();
-    Message *get_msg();
+    Message *get_msg(uint16_t timeout = 0);
 
     int close();
 
@@ -56,11 +58,5 @@ struct RCSSocket {
 };
 
 // TODO: destroy all sockets
-
-struct RCSSocketException {
-    int err_code;
-
-    RCSSocketException(int err_code) : err_code(err_code) {}
-};
 
 #endif
