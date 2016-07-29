@@ -189,6 +189,13 @@ int rcsSend(int sockfd, void *buf, int len) {
         return -1;
     }
 
+    if (rcs_sock->state != RCS_STATE_ESTABLISHED &&
+        rcs_sock->state != RCS_STATE_CLOSE_WAIT) {
+
+        // set errno
+        return -1;
+    }
+
     int max_content_size = MAX_UCP_PACKET_SIZE - HEADER_SIZE;
 
     // The return value will be wrong if this isn't true
@@ -207,8 +214,26 @@ int rcsClose(int sockfd) {
     RCSSocket *rcs_sock;
     try {
         rcs_sock = RCSSocket::get(sockfd);
-        rcs_sock->close();
     } catch (RCSException e) {
         return -1;
     }
+
+    Message *fin = new Message(NULL, 0, FLAG_FIN);
+    rcs_sock->send_q.push_back(fin);
+    rcs_sock->flush_send_q();
+
+    if (rcs_sock->state == RCS_STATE_ESTABLISHED) {
+        // begin teardown by sending the first FIN and waiting
+        // can no longer send after this point
+        rcs_sock->state = RCS_STATE_FIN_WAIT;
+        rcs_sock->fin_wait();
+    } else if (rcs_sock->state != RCS_STATE_CLOSE_WAIT) {
+        // if we are in the CLOSE_WAIT state and got our message ack'ed,
+        // we may safely proceed to die
+
+        // set errno
+        return -1;
+    }
+
+    return rcs_sock->close();
 }

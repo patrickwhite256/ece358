@@ -79,8 +79,20 @@ RCSSocket *RCSSocket::create_bound() {
  *  returns 0 on success
  */
 int RCSSocket::close() {
-    // TODO: don't close ucp sockfd unless this is the listener
-    int result = ucpClose(ucp_sockfd);
+    // count the number of RCS sockets that are bound to the same ucp socket as this one
+    int sock_count = 0;
+    for (std::map<int, RCSSocket*>::iterator it = g_rcs_sockets.begin(); it != g_rcs_sockets.end(); ++it) {
+        if (it->second->ucp_sockfd == ucp_sockfd) {
+            sock_count++;
+        }
+    }
+
+    int result = 0;
+
+    // close the UCP socket if this is the last RCS socket bound to it
+    if (sock_count == 1) {
+        result = ucpClose(ucp_sockfd);
+    }
 
     if (result == 0) {
         RCSSocket::g_rcs_sockets.erase(this->id);
@@ -337,4 +349,30 @@ void RCSSocket::update_timeout(uint32_t rtt) {
 
 uint32_t RCSSocket::get_timeout() {
     return est_rtt * 2;
+}
+
+void RCSSocket::fin_wait() {
+    // throw out messages until we get a FIN
+    while (true) {
+        Message *fin = recv();
+
+        if (fin->is_fin()) {
+            state = RCS_STATE_TIME_WAIT;
+            delete fin;
+            break;
+        }
+
+        delete fin;
+    }
+
+    // wait until we timeout before we assume our ack was recieved
+    while (true) {
+        try {
+            Message *resent_fin = get_msg(2 * RESEND_TIMEOUT_MS);
+            resend_ack();
+            delete resent_fin;
+        } catch (RCSException e) {
+            break;
+        }
+    }
 }

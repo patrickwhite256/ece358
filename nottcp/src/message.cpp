@@ -151,6 +151,10 @@ bool Message::is_syn() {
     return (flags & FLAG_SYN) > 0;
 }
 
+bool Message::is_fin() {
+    return (flags & FLAG_FIN) > 0;
+}
+
 uint8_t Message::get_sqn() {
     return (flags & FLAG_SQN) > 0;
 }
