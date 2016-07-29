@@ -89,12 +89,14 @@ int rcsAccept(int sockfd, struct sockaddr_in *addr) {
     }
 
     RCSSocket *rcs_sock = listen_sock->create_bound();
+    listen_sock->recv_seq_n = 0;
     rcs_sock->recv_seq_n = 1;
 
     Message *syn_ack = new Message(new char[0], 0, FLAG_SYN);
     rcs_sock->send_q.push_back(syn_ack);
 
     rcs_sock->flush_send_q(); // send SYN and wait for ACK
+    rcs_sock->state = RCS_STATE_ESTABLISHED;
 
     return rcs_sock->id;
 }
@@ -123,6 +125,9 @@ int rcsConnect(int sockfd, const struct sockaddr_in *addr) {
     } else {
         assert(false);
     }
+
+    rcs_sock->timed_ack_wait();
+    rcs_sock->state = RCS_STATE_ESTABLISHED;
 
     return 0;
 }

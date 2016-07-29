@@ -59,6 +59,7 @@ struct RCSSocket {
     void assign_sockfd();
     Message *get_msg(uint32_t timeout = 0);
 
+    void timed_ack_wait();
     void fin_wait();
     int close();
 

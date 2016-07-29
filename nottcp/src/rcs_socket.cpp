@@ -91,6 +91,7 @@ int RCSSocket::close() {
 
     // close the UCP socket if this is the last RCS socket bound to it
     if (sock_count == 1) {
+        std::cout << "this is the last RCS sock bound to UCP sockfd " << ucp_sockfd << ". closing it" << std::endl;
         result = ucpClose(ucp_sockfd);
     }
 
@@ -362,6 +363,23 @@ uint32_t RCSSocket::get_timeout() {
     return est_rtt * 2;
 }
 
+// waits for double the resend timeout in order to be confident that an
+// ack has been received
+void RCSSocket::timed_ack_wait() {
+    std::cout << "waiting for ack to be recieved" << std::endl;
+    while (true) {
+        try {
+            Message *resent_msg = get_msg(2 * get_timeout());
+            std::cout << "packet was resenti. resending ack" << std::endl;
+            resend_ack();
+            delete resent_msg;
+        } catch (RCSException e) {
+            std::cout << "done waiting" << std::endl;
+            break;
+        }
+    }
+}
+
 void RCSSocket::fin_wait() {
     // throw out messages until we get a FIN
     while (true) {
@@ -376,14 +394,5 @@ void RCSSocket::fin_wait() {
         delete fin;
     }
 
-    // wait until we timeout before we assume our ack was recieved
-    while (true) {
-        try {
-            Message *resent_fin = get_msg(2 * RESEND_TIMEOUT_MS);
-            resend_ack();
-            delete resent_fin;
-        } catch (RCSException e) {
-            break;
-        }
-    }
+    timed_ack_wait();
 }
