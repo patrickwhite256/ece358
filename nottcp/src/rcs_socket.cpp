@@ -6,9 +6,7 @@
 #include <cassert>
 #include <iostream>
 
-#include <netinet/in.h>
-#include <netinet/ip.h>
-#include <arpa/inet.h>
+#include <sys/timeb.h>
 
 using namespace std;
 
@@ -145,7 +143,6 @@ int RCSSocket::flush_send_q() {
 
     while(!send_q.empty()) {
         Message *msg = send_q.front();
-        cout << msg << endl;
 
         msg->s_port = id;
         msg->d_port = remote_port;
@@ -168,12 +165,15 @@ int RCSSocket::flush_send_q() {
             continue;
         }
 
+        timeb time_sent, time_recv;
+        ftime(&time_sent);
         try {
             recv_ack();
         } catch(RCSException &ex) {
             if(ex.err_code == RCS_ERROR_TIMEOUT) {
 #ifdef DEBUG
                 cout << "timeout on ack; resending." << endl;
+                update_timeout(get_timeout()); // increase timeout
 #endif
                 continue;
             } else if(ex.err_code == RCS_ERROR_CORRUPT) {
@@ -189,6 +189,10 @@ int RCSSocket::flush_send_q() {
             }
             assert(false);
         }
+        ftime(&time_recv);
+        uint32_t rtt = (time_recv.time - time_sent.time) * 1000 +
+                       (time_recv.millitm - time_sent.millitm);
+        update_timeout(rtt);
 
         sent += msg->get_content_size();
 
@@ -203,8 +207,8 @@ int RCSSocket::flush_send_q() {
     return sent;
 }
 
-Message *RCSSocket::get_msg(uint16_t timeout) {
-    uint16_t timeout_left = timeout;
+Message *RCSSocket::get_msg(uint32_t timeout) {
+    uint32_t timeout_left = timeout;
     while(true) {
         // clear out ucp socket, then get something from the mq
         while(true) {
@@ -258,7 +262,7 @@ Message *RCSSocket::get_msg(uint16_t timeout) {
 void RCSSocket::recv_ack() {
     Message *msg;
     while(true) { // wait until we get an in order data segment
-        msg = get_msg(RESEND_TIMEOUT_MS);
+        msg = get_msg(get_timeout());
         if(msg->is_ack() && msg->get_akn() != send_seq_n) { //out of order ack
             delete msg;
             continue;
@@ -325,4 +329,12 @@ Message *RCSSocket::recv(bool no_ack) {
 #endif
 
     return msg;
+}
+
+void RCSSocket::update_timeout(uint32_t rtt) {
+    est_rtt = (1 - RTT_EST_UPDATE_FACTOR) * est_rtt + RTT_EST_UPDATE_FACTOR * rtt;
+}
+
+uint32_t RCSSocket::get_timeout() {
+    return est_rtt * 2;
 }
