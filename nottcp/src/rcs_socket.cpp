@@ -90,16 +90,21 @@ RCSSocket *RCSSocket::get(int sockfd) {
 }
 
 void RCSSocket::send_ack() {
+#ifdef DEBUG
+    cout << "Sending ack." << endl;
+#endif
     Message *ack = new Message(NULL, 0, FLAG_ACK);
     ack->s_port = id;
     ack->d_port = remote_port;
     ack->set_akn(recv_seq_n);
     int b_sent = 0;
     uint8_t *ack_buf = ack->serialize();
+#ifdef VERBOSE
     cout << "sending ack.     size:        " << +ack->size << endl;
     cout << "                 source port: " << +ack->s_port << endl;
     cout << "                 dest port:   " << +ack->d_port << endl;
     cout << "                 sequence #:  " << +(ack->flags & FLAG_SQN) << endl;
+#endif
     while(b_sent != ack->size) {
         b_sent = ucpSendTo(ucp_sockfd, ack_buf, ack->size, cxn_addr);
     }
@@ -109,6 +114,9 @@ void RCSSocket::send_ack() {
 }
 
 void RCSSocket::resend_ack() {
+#ifdef DEBUG
+    cout << "Resending ack." << endl;
+#endif
     uint8_t *ack_buf = last_ack->serialize();
     int b_sent = 0;
     while(b_sent != last_ack->size) {
@@ -126,10 +134,16 @@ int RCSSocket::flush_send_q() {
         msg->d_port = remote_port;
         msg->set_sqn(send_seq_n);
 
+#ifdef VERBOSE
         cout << "sending message. size:        " << +msg->size << endl;
         cout << "                 source port: " << +msg->s_port << endl;
         cout << "                 dest port:   " << +msg->d_port << endl;
         cout << "                 sequence #:  " << +(msg->flags & FLAG_SQN) << endl;
+        cout << "                 ack #:       " << +(msg->flags & FLAG_AKN) << endl;
+#endif
+#ifdef DEBUG
+        cout << "Sending data." << endl;
+#endif
 
         const uint8_t *msg_buf = msg->serialize();
         int b_sent = ucpSendTo(ucp_sockfd, msg_buf, msg->size, cxn_addr);
@@ -155,6 +169,9 @@ int RCSSocket::flush_send_q() {
         sent += msg->get_content_size();
 
         send_seq_n = !send_seq_n;
+#ifdef DEBUG
+        cout << "SEND SQN: " << +send_seq_n << endl;
+#endif
         send_q.pop_front();
         delete msg;
     }
@@ -177,10 +194,16 @@ Message *RCSSocket::get_msg(uint16_t timeout) {
 
             Message *msg = Message::deserialize(msg_buf, b_recv);
 
+#ifdef DEBUG
+            cout << "Received data/ack" << endl;
+#endif
+#ifdef VERBOSE
             cout << "received message. size:        " << +msg->size << endl;
             cout << "                  source port: " << +msg->s_port << endl;
             cout << "                  dest port:   " << +msg->d_port << endl;
             cout << "                  sequence #:  " << +(msg->flags & FLAG_SQN) << endl;
+            cout << "                  ack #:       " << +(msg->flags & FLAG_AKN) << endl;
+#endif
 
             try {
                 msg->validate();
@@ -224,6 +247,9 @@ void RCSSocket::recv_ack() {
             messages.push_back(msg); //requeue
             continue;
         } else { // out of order data packet
+#ifdef DEBUG
+            cout << "received out of order data, resending ack" << endl;
+#endif
             resend_ack();
             delete msg;
             continue; // get new packet
@@ -237,7 +263,9 @@ void RCSSocket::recv_ack() {
     } else {
         delete msg;
     }
-    cout << "received ack" << endl;
+#ifdef DEBUG
+    cout << "Received ack" << endl;
+#endif
 }
 
 Message *RCSSocket::recv(bool no_ack) {
@@ -252,10 +280,16 @@ Message *RCSSocket::recv(bool no_ack) {
         }
         if(msg->is_ack()) {
             // out of order ack. ignore, get new.
+#ifdef DEBUG
+            cout << "received out of order data, ignoring" << endl;
+#endif
             assert(msg->get_akn() != send_seq_n);
             delete msg;
             continue; // get new packet
         } else if (msg->get_sqn() != recv_seq_n) {
+#ifdef DEBUG
+            cout << "received out of order data, resending ack" << endl;
+#endif
             // out of order data
             resend_ack(); // resend ack
             delete msg;
@@ -263,12 +297,18 @@ Message *RCSSocket::recv(bool no_ack) {
         }
         break; // in order data
     }
+#ifdef DEBUG
+    cout << "Received data" << endl;
+#endif
 
     remote_port = msg->s_port;
     if(!no_ack) {
         send_ack();
     }
     recv_seq_n = !recv_seq_n;
+#ifdef DEBUG
+    cout << "RECV SQN: " << +recv_seq_n << endl;
+#endif
 
     return msg;
 }

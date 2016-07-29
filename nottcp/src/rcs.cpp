@@ -165,7 +165,7 @@ int rcsRecv(int sockfd, void *buf, int len) {
 
     // no buffered data, get a new message
     Message *msg = rcs_sock->recv();
-    memcpy(buf, msg->content, len);
+    memcpy(buf, msg->content, min(msg->get_content_size(), (uint16_t)len));
 
     if (msg->get_content_size() <= len) {
         // return what we got if that's all there is
