@@ -1,6 +1,6 @@
 CXX=g++
 DEBUG ?= -DDEBUG
-VERBOSE ?=
+VERBOSE ?= -DVERBOSE
 CXXFLAGS= -g -Wall $(DEBUG) $(VERBOSE) -std=c++11
 LDFLAGS = -pthread
 EXECS=message-test rcsapp-client rcsapp-server

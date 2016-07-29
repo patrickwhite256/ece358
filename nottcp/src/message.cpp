@@ -39,6 +39,7 @@ Message::Message(const char *msg_content, uint16_t content_size, uint8_t msg_fla
     flags = msg_flags;
     size = HEADER_SIZE + content_size;
     header = NULL;
+    random = rand();
 }
 
 Message::~Message() {
@@ -72,6 +73,7 @@ void Message::set_header() {
     header[FLAGS_OFFSET] = flags;
     header[DPORT_OFFSET] = d_port;
     header[SPORT_OFFSET] = s_port;
+    header[RAND_OFFSET] = random;
 }
 
 /**
@@ -181,6 +183,7 @@ Message *Message::deserialize(const uint8_t *buf, uint16_t buf_len) {
     uint8_t flags = buf[FLAGS_OFFSET];
     uint8_t dport = buf[DPORT_OFFSET];
     uint8_t sport = buf[SPORT_OFFSET];
+    uint8_t random = buf[RAND_OFFSET];
     uint16_t size = (buf[SIZE_OFFSET] << 8) + buf[SIZE_OFFSET + 1];
     if(buf_len < size) {
         throw RCSException(RCS_ERROR_CORRUPT);
@@ -194,6 +197,7 @@ Message *Message::deserialize(const uint8_t *buf, uint16_t buf_len) {
     ret->d_port = dport;
     ret->s_port = sport;
     ret->checksum = checksum;
+    ret->random = random;
 
     delete[] content;
 

@@ -16,6 +16,22 @@ int RCSSocket::g_rcs_sock_counter = 0;
 map<int, RCSSocket *> RCSSocket::g_rcs_sockets;
 
 
+void print_msg_data(Message *msg, bool send) {
+    const char * action = "send";
+    if(!send) action = "recv";
+    if(msg->flags & FLAG_ACK)
+        cout << action << "ing ack.     size:        " << +msg->size << endl;
+    else
+        cout << action << "ing data.    size:        " << +msg->size << endl;
+    cout << "                 source port: " << +msg->s_port << endl;
+    cout << "                 dest port:   " << +msg->d_port << endl;
+    cout << "                 flags:       " << +msg->flags << endl;
+    cout << "                 sequence #:  " << +(msg->flags & FLAG_SQN) << endl;
+    cout << "                 ack #:       " << +(msg->flags & FLAG_AKN) << endl;
+    cout << "                 checksum:    " << msg->checksum << endl;
+}
+
+
 /**
  * assign_sockfd - void
  *  assigns a new unique id to the RCSSocket and adds it to the gloal map.
@@ -99,14 +115,10 @@ void RCSSocket::send_ack() {
     ack->set_akn(recv_seq_n);
     int b_sent = 0;
     uint8_t *ack_buf = ack->serialize();
-#ifdef VERBOSE
-    cout << "sending ack.     size:        " << +ack->size << endl;
-    cout << "                 source port: " << +ack->s_port << endl;
-    cout << "                 dest port:   " << +ack->d_port << endl;
-    cout << "                 sequence #:  " << +(ack->flags & FLAG_SQN) << endl;
-    cout << "                 ack #:       " << +(ack->flags & FLAG_SQN) << endl;
-#endif
     while(b_sent != ack->size) {
+#ifdef VERBOSE
+        print_msg_data(ack, true);
+#endif
         b_sent = ucpSendTo(ucp_sockfd, ack_buf, ack->size, cxn_addr);
     }
 
@@ -121,6 +133,9 @@ void RCSSocket::resend_ack() {
     uint8_t *ack_buf = last_ack->serialize();
     int b_sent = 0;
     while(b_sent != last_ack->size) {
+#ifdef VERBOSE
+        print_msg_data(last_ack, true);
+#endif
         b_sent = ucpSendTo(ucp_sockfd, ack_buf, last_ack->size, cxn_addr);
     }
 }
@@ -130,23 +145,20 @@ int RCSSocket::flush_send_q() {
 
     while(!send_q.empty()) {
         Message *msg = send_q.front();
+        cout << msg << endl;
 
         msg->s_port = id;
         msg->d_port = remote_port;
         msg->set_sqn(send_seq_n);
+        const uint8_t *msg_buf = msg->serialize();
 
 #ifdef VERBOSE
-        cout << "sending message. size:        " << +msg->size << endl;
-        cout << "                 source port: " << +msg->s_port << endl;
-        cout << "                 dest port:   " << +msg->d_port << endl;
-        cout << "                 sequence #:  " << +(msg->flags & FLAG_SQN) << endl;
-        cout << "                 ack #:       " << +(msg->flags & FLAG_AKN) << endl;
+        print_msg_data(msg, true);
 #endif
 #ifdef DEBUG
         cout << "Sending data." << endl;
 #endif
 
-        const uint8_t *msg_buf = msg->serialize();
         int b_sent = ucpSendTo(ucp_sockfd, msg_buf, msg->size, cxn_addr);
         if(b_sent != msg->size) {
             // incomplete packet sent; retry
@@ -167,6 +179,11 @@ int RCSSocket::flush_send_q() {
             } else if(ex.err_code == RCS_ERROR_CORRUPT) {
 #ifdef DEBUG
                 cout << "corrupt ack; resending." << endl;
+#endif
+                continue;
+            } else if(ex.err_code == RCS_ERROR_RESEND) {
+#ifdef DEBUG
+                cout << "in order data while waiting for ack; resending" << endl;
 #endif
                 continue;
             }
@@ -201,20 +218,12 @@ Message *RCSSocket::get_msg(uint16_t timeout) {
 
             Message *msg = Message::deserialize(msg_buf, b_recv);
 
-#ifdef DEBUG
-            cout << "Received data/ack" << endl;
-#endif
-#ifdef VERBOSE
-            cout << "received message. size:        " << +msg->size << endl;
-            cout << "                  source port: " << +msg->s_port << endl;
-            cout << "                  dest port:   " << +msg->d_port << endl;
-            cout << "                  sequence #:  " << +(msg->flags & FLAG_SQN) << endl;
-            cout << "                  ack #:       " << +(msg->flags & FLAG_AKN) << endl;
-#endif
-
             try {
                 msg->validate();
             } catch (RCSException &ex) {
+#ifdef DEBUG
+                cout << "received corrupt data" << endl;
+#endif
                 assert(ex.err_code == RCS_ERROR_CORRUPT);
                 delete msg;
                 throw;
@@ -234,6 +243,9 @@ Message *RCSSocket::get_msg(uint16_t timeout) {
         if(!messages.empty()) {
             Message *msg = messages.front();
             messages.pop_front();
+#ifdef VERBOSE
+            print_msg_data(msg, false);
+#endif
             return msg;
         }
         if(timeout > 0) {
@@ -247,13 +259,13 @@ void RCSSocket::recv_ack() {
     Message *msg;
     while(true) { // wait until we get an in order data segment
         msg = get_msg(RESEND_TIMEOUT_MS);
-        if(msg->is_ack()) {
-            // must be in order ack
-            assert(msg->get_akn() == send_seq_n);
-        } else if(msg->get_sqn() == recv_seq_n) { // in order data packet
-            messages.push_back(msg); //requeue
+        if(msg->is_ack() && msg->get_akn() != send_seq_n) { //out of order ack
+            delete msg;
             continue;
-        } else { // out of order data packet
+        } else if(!msg->is_ack() && msg->get_sqn() == recv_seq_n) { // in order data packet
+            delete msg;
+            throw RCSException(RCS_ERROR_RESEND); // resend data
+        } else if(!msg->is_ack()){ // out of order data packet
 #ifdef DEBUG
             cout << "received out of order data, resending ack" << endl;
 #endif
@@ -262,13 +274,6 @@ void RCSSocket::recv_ack() {
             continue; // get new packet
         }
         break; // in order ack
-    }
-    if(msg->is_syn()) {
-        // requeue SYNACK as SYN
-        msg->flags ^= FLAG_ACK;
-        messages.push_back(msg);
-    } else {
-        delete msg;
     }
 #ifdef DEBUG
     cout << "Received ack" << endl;

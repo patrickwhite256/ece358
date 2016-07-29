@@ -79,7 +79,7 @@ int rcsAccept(int sockfd, struct sockaddr_in *addr) {
     }
 
     while(true) {
-        Message *syn_msg = listen_sock->recv(true);
+        Message *syn_msg = listen_sock->recv();
         memcpy(addr, listen_sock->cxn_addr, sizeof(sockaddr_in));
         if (syn_msg->is_syn()) {
             delete syn_msg;
@@ -91,10 +91,10 @@ int rcsAccept(int sockfd, struct sockaddr_in *addr) {
     RCSSocket *rcs_sock = listen_sock->create_bound();
     rcs_sock->recv_seq_n = 1;
 
-    Message *syn_ack = new Message(new char[0], 0, FLAG_SYN | FLAG_ACK);
+    Message *syn_ack = new Message(new char[0], 0, FLAG_SYN);
     rcs_sock->send_q.push_back(syn_ack);
 
-    rcs_sock->flush_send_q(); // send SYN-ACK and wait for ACK
+    rcs_sock->flush_send_q(); // send SYN and wait for ACK
 
     return rcs_sock->id;
 }

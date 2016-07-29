@@ -11,16 +11,19 @@
 #define DPORT_SIZE      1 // 8 bits
 #define SPORT_SIZE      1 // 8 bits
 #define FLAGS_SIZE      1 // 8 bits
+#define RAND_SIZE       1 // 8 bits
 
-#define HEADER_SIZE (CHECKSUM_SIZE + SIZE_SIZE + DPORT_SIZE + SPORT_SIZE + FLAGS_SIZE)
+#define HEADER_SIZE (CHECKSUM_SIZE + SIZE_SIZE + DPORT_SIZE + SPORT_SIZE + FLAGS_SIZE + RAND_SIZE)
 
 #define CHECKSUM_OFFSET 0
 #define SIZE_OFFSET     (CHECKSUM_OFFSET + CHECKSUM_SIZE)
 #define DPORT_OFFSET    (SIZE_OFFSET     + SIZE_SIZE)
 #define SPORT_OFFSET    (DPORT_OFFSET    + DPORT_SIZE)
 #define FLAGS_OFFSET    (SPORT_OFFSET    + SPORT_SIZE)
+#define RAND_OFFSET     (FLAGS_OFFSET    + FLAGS_SIZE)
 
 #include <cstdint>
+#include <cstdlib>
 
 #include "rcs_exception.h"
 
@@ -34,7 +37,7 @@
  * |-------------------------|
  * |  dest port  | src port  |
  * |-------------------------|
- * | 8 flag bits |           |
+ * | 8 flag bits | random #  |
  *  -------------------------
  */
 
@@ -44,6 +47,7 @@ struct Message {
     uint8_t s_port = 0;
     uint8_t d_port = 0;
     uint8_t *header;
+    uint8_t random;
     char *content;
     uint16_t size;
 
