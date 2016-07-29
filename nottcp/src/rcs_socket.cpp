@@ -123,6 +123,11 @@ void RCSSocket::send_ack() {
     ack->s_port = id;
     ack->d_port = remote_port;
     ack->set_akn(recv_seq_n);
+
+    if (state == RCS_STATE_CLOSE_WAIT || state == RCS_STATE_FIN_WAIT) {
+        ack->flags |= FLAG_FIN;
+    }
+
     int b_sent = 0;
     uint8_t *ack_buf = ack->serialize();
     while(b_sent != ack->size) {

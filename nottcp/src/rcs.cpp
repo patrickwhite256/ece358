@@ -137,6 +137,11 @@ int rcsRecv(int sockfd, void *buf, int len) {
         return -1;
     }
 
+    if (rcs_sock->state == RCS_STATE_CLOSE_WAIT) {
+        // dead peers tell no tales
+        return -1;
+    }
+
     if (rcs_sock->data_buf_size && rcs_sock->data_buf_size <= len) {
         // buffered data is lis less than is asked for
         // return what's there
@@ -207,7 +212,11 @@ int rcsSend(int sockfd, void *buf, int len) {
         rcs_sock->send_q.push_back(msg);
     }
 
-    return rcs_sock->flush_send_q();
+    int send_status = rcs_sock->flush_send_q();
+
+    assert(send_status > 0);
+
+    return send_status;
 }
 
 int rcsClose(int sockfd) {
