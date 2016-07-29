@@ -104,6 +104,7 @@ void RCSSocket::send_ack() {
     cout << "                 source port: " << +ack->s_port << endl;
     cout << "                 dest port:   " << +ack->d_port << endl;
     cout << "                 sequence #:  " << +(ack->flags & FLAG_SQN) << endl;
+    cout << "                 ack #:       " << +(ack->flags & FLAG_SQN) << endl;
 #endif
     while(b_sent != ack->size) {
         b_sent = ucpSendTo(ucp_sockfd, ack_buf, ack->size, cxn_addr);
@@ -149,7 +150,9 @@ int RCSSocket::flush_send_q() {
         int b_sent = ucpSendTo(ucp_sockfd, msg_buf, msg->size, cxn_addr);
         if(b_sent != msg->size) {
             // incomplete packet sent; retry
+#ifdef DEBUG
             cout << "did not send complete segment; resending" << endl;
+#endif
             continue;
         }
 
@@ -157,10 +160,14 @@ int RCSSocket::flush_send_q() {
             recv_ack();
         } catch(RCSException &ex) {
             if(ex.err_code == RCS_ERROR_TIMEOUT) {
+#ifdef DEBUG
                 cout << "timeout on ack; resending." << endl;
+#endif
                 continue;
             } else if(ex.err_code == RCS_ERROR_CORRUPT) {
+#ifdef DEBUG
                 cout << "corrupt ack; resending." << endl;
+#endif
                 continue;
             }
             assert(false);
@@ -275,7 +282,9 @@ Message *RCSSocket::recv(bool no_ack) {
             msg = get_msg();
         } catch (RCSException &ex) {
             assert(ex.err_code == RCS_ERROR_CORRUPT);
+#ifdef DEBUG
             cout << "received corrupt packet, discarding" << endl;
+#endif
             continue;
         }
         if(msg->is_ack()) {
