@@ -332,9 +332,15 @@ Message *RCSSocket::recv(bool no_ack) {
 #endif
 
     remote_port = msg->s_port;
+
+    if (msg->is_fin()) {
+        state = RCS_STATE_CLOSE_WAIT;
+    }
+
     if(!no_ack) {
         send_ack();
     }
+
     recv_seq_n = !recv_seq_n;
 #ifdef DEBUG
     cout << "RECV SQN: " << +recv_seq_n << endl;

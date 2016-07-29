@@ -218,6 +218,8 @@ int rcsClose(int sockfd) {
         return -1;
     }
 
+
+    std::cout << "sending FIN" << std::endl;
     Message *fin = new Message(NULL, 0, FLAG_FIN);
     rcs_sock->send_q.push_back(fin);
     rcs_sock->flush_send_q();
@@ -226,6 +228,7 @@ int rcsClose(int sockfd) {
         // begin teardown by sending the first FIN and waiting
         // can no longer send after this point
         rcs_sock->state = RCS_STATE_FIN_WAIT;
+        std::cout << "close initiator waiting on fin" << std::endl;
         rcs_sock->fin_wait();
     } else if (rcs_sock->state != RCS_STATE_CLOSE_WAIT) {
         // if we are in the CLOSE_WAIT state and got our message ack'ed,
@@ -235,5 +238,6 @@ int rcsClose(int sockfd) {
         return -1;
     }
 
+    std::cout << "closing socket" << std::endl;
     return rcs_sock->close();
 }
