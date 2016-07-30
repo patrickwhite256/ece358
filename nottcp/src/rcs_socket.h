@@ -16,7 +16,9 @@
 
 #define UCP_TIMEOUT_STEP_MS 10
 #define MAX_UCP_PACKET_SIZE 1000
-#define RESEND_TIMEOUT_MS   1000
+
+#define INITIAL_TIMEOUT       100
+#define RTT_EST_UPDATE_FACTOR 0.125
 
 struct RCSSocket {
     static int g_rcs_sock_counter;
@@ -35,6 +37,7 @@ struct RCSSocket {
 
     uint8_t send_seq_n = 0;
     uint8_t recv_seq_n = 0;
+    uint32_t est_rtt = INITIAL_TIMEOUT;
 
     RCSSocket() : state(RCS_STATE_NEW), cxn_addr(new sockaddr_in), data_buf_size(0) {}
     RCSSocket(int sockfd) : ucp_sockfd(sockfd), state(RCS_STATE_NEW), cxn_addr(new sockaddr_in), data_buf_size(0) {}
@@ -42,14 +45,15 @@ struct RCSSocket {
 
     int flush_send_q();
     Message *recv(bool no_ack = false);
-
     RCSSocket *create_bound();
+    uint32_t get_timeout();
 
+    void update_timeout(uint32_t rtt);
     void send_ack();
     void recv_ack();
     void resend_ack();
     void assign_sockfd();
-    Message *get_msg(uint16_t timeout = 0);
+    Message *get_msg(uint32_t timeout = 0);
 
     int close();
 
