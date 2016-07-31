@@ -35,5 +35,25 @@ Go-Back-N can suffer the same problem as selective repeat, but only if the size 
 \section{}
 In which we answer question 5
 \section{}
-In which we answer question 6
+We begin by finding the number of bytes sent in between losses, $B$:
+\begin{align*}
+    B&=\frac{W}{2} + \left(\frac{W}{2} + MSS\right) + \left(\frac{W}{2} + 2MSS\right) + \cdots + W \\
+     &=\frac{\left(\frac{W}{2MSS}+1\right)\left(\frac{W}{2}+W\right)}{2} \\
+     &=\frac{\left(\frac{W+2\cdot MSS}{2MSS}\right)\left(\frac{3W}{2}\right)}{2} \\
+     &=\frac{3W^2+6WMSS}{8MSS} \\
+     &=\frac{3W^2}{8MSS} + 0.75 W \\
+     &\approx \frac{3W^2}{8MSS}
+\end{align*}
+The number of segments sent in between losses, $S=B/MSS\approx\displaystyle\frac{3W^2}{8MSS^2}$.
+
+The loss rate $L=1/S\approx\displaystyle\frac{8MSS^2}{3W^2}$.
+\begin{align*}
+    L&=\frac{8MSS^2}{3W^2} \\
+    W^2&=\frac{8MSS^2}{3L} \\
+    W&=MSS\sqrt{\frac{8}{3}}\frac{1}{\sqrt{L}} \\
+    T&=\frac{3W}{4RTT} \\
+    &\approx\frac{3}{4RTT}\cdot MSS\sqrt{\frac{8}{3}}\frac{1}{\sqrt{L}} \\
+    &=\frac{3}{4}\sqrt{\frac{8}{3}}\frac{MSS}{RTT\sqrt{L}} \\
+    &=\frac{1.22MSS}{RTT\sqrt{L}}
+\end{align*}
 \end{document}
