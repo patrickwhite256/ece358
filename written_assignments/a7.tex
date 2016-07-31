@@ -11,9 +11,14 @@
 \title{ECE358 S'16 Assignment 7}
 \maketitle
 \section{}
-In which we answer question 1
+We can assert the following: if \texttt{udt\_send} has a chance of sending an intact packet that is received by the host on the other side, rdt3.0 guarantees that a segment send by the sender will be received by the receiver in a finite amount of time.
 \section{}
-In which we answer question 2
+Yes, GBN correctly deals with reordered packets, as a corollary of the property that there is only one packet it will accept at a time.
+If a packet with sequence number $n$ is expected by the receiver, but held by the network, the receiver will receive packets with sequence numbers greater than $n$.
+Upon receiving each of these, the receiver will send an ACK for packet $n-1$.
+When packet $n$ is eventually delivered, the receiver will ACK it and expect packet $n+1$.
+The sender may receive the $n-1$ ACKs and resend packets starting with packet $n$.
+This can result in the receiver receiving multiple copies of packet $n$, but this is not a problem, as the receiver will only deliver one of them since when the second one arrives, it will no longer be the expected packet.
 \section{}
 In which we answer question three
 \section{}
