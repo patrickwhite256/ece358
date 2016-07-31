@@ -33,7 +33,9 @@ Go-Back-N can suffer the same problem as selective repeat, but only if the size 
 \end{enumerate}
 
 \section{}
-In which we answer question 5
+
+Waiting for the final ACK from the client ensures that the server is aware of whether or not the client is in the ESTAB state, so it knows that there will be no duplicate connection requests that may be queued for later to cause the problems illustrated on slide 3-79.
+
 \section{}
 We begin by finding the number of bytes sent in between losses, $B$:
 \begin{align*}
