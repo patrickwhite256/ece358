@@ -6,6 +6,7 @@
 \usepackage[margin=1in]{geometry}
 \usepackage{amssymb}
 \usepackage{tikz}
+\usepackage{enumitem}
 \author{Joel Mizzoni (jmizzoni), Patrick White (ps2white)}
 \begin{document}
 \title{ECE358 S'16 Assignment 7}
@@ -20,9 +21,17 @@ When packet $n$ is eventually delivered, the receiver will ACK it and expect pac
 The sender may receive the $n-1$ ACKs and resend packets starting with packet $n$.
 This can result in the receiver receiving multiple copies of packet $n$, but this is not a problem, as the receiver will only deliver one of them since when the second one arrives, it will no longer be the expected packet.
 \section{}
-In which we answer question three
+Go-Back-N can suffer the same problem as selective repeat, but only if the size of the sender window is equal to the size of the sequence number space (which would be a bad decision). This would require the receiver to successfully receive and ACK a number of packets equal to the size of the sequence number space and for all of those ACKs to be subsequently lost.
+
 \section{}
-In which we answer question 4
+
+\begin{enumerate}[label=\alph*)]
+    \item
+        We avoid counting retransmissions because it might be the case that we timed out while an ACK was on its way to us and it is received very shortly after the we retransmit. We can't differentiate between an ACK that responded to the original transmission as opposed to a retransmission, so we just ignore measurements from retransmissions altogether.
+    \item
+        Fast retransmit waits for 3 duplicate ACKs because 1 or 2 duplicate ACKs is more likely to be a symptom of a reordering of packets rather than a loss. Once the third duplicate ACK is received, we can be fairly confident that the packet was lost [source: https://tools.ietf.org/html/rfc2001 Section 3: Fast Retransmit].
+\end{enumerate}
+
 \section{}
 In which we answer question 5
 \section{}
