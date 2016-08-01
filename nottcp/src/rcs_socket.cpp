@@ -13,7 +13,7 @@ using namespace std;
 
 int RCSSocket::g_rcs_sock_counter = 0;
 map<int, RCSSocket *> RCSSocket::g_rcs_sockets;
-
+map<int, std::mutex *> RCSSocket::g_ucp_sock_mutexes;
 
 void print_msg_data(Message *msg, bool send) {
     const char * action = "send";
@@ -52,6 +52,8 @@ void RCSSocket::assign_sockfd() {
 int RCSSocket::create() {
     RCSSocket *rcs_sock = new RCSSocket(ucpSocket());
 
+    g_ucp_sock_mutexes.insert(pair<int, std::mutex *>(rcs_sock->ucp_sockfd, new std::mutex()));
+
     rcs_sock->assign_sockfd();
 
     return rcs_sock->id;
@@ -71,6 +73,14 @@ RCSSocket *RCSSocket::create_bound() {
     last_ack = NULL;
     rcs_sock->parent_sock = this;
 
+    try {
+        rcs_sock->get_ucp_mutex();
+    } catch (RCSException e) {
+        if (e.err_code == RCS_ERROR_NO_MUTEX) {
+            g_ucp_sock_mutexes.insert(pair<int, std::mutex *>(rcs_sock->ucp_sockfd, new std::mutex()));
+        }
+    }
+
     return rcs_sock;
 }
 
@@ -82,7 +92,7 @@ RCSSocket *RCSSocket::create_bound() {
 int RCSSocket::close() {
     // count the number of RCS sockets that are bound to the same ucp socket as this one
     int sock_count = 0;
-    for (std::map<int, RCSSocket*>::iterator it = g_rcs_sockets.begin(); it != g_rcs_sockets.end(); ++it) {
+    for (auto it = g_rcs_sockets.begin(); it != g_rcs_sockets.end(); ++it) {
         if (it->second->ucp_sockfd == ucp_sockfd) {
             sock_count++;
         }
@@ -92,7 +102,10 @@ int RCSSocket::close() {
 
     // close the UCP socket if this is the last RCS socket bound to it
     if (sock_count == 1) {
+#ifdef DEBUG
         std::cout << "this is the last RCS sock bound to UCP sockfd " << ucp_sockfd << ". closing it" << std::endl;
+#endif
+        g_ucp_sock_mutexes.erase(ucp_sockfd);
         result = ucpClose(ucp_sockfd);
     }
 
