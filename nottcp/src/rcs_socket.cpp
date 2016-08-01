@@ -79,8 +79,21 @@ RCSSocket *RCSSocket::create_bound() {
  *  returns 0 on success
  */
 int RCSSocket::close() {
-    // TODO: don't close ucp sockfd unless this is the listener
-    int result = ucpClose(ucp_sockfd);
+    // count the number of RCS sockets that are bound to the same ucp socket as this one
+    int sock_count = 0;
+    for (std::map<int, RCSSocket*>::iterator it = g_rcs_sockets.begin(); it != g_rcs_sockets.end(); ++it) {
+        if (it->second->ucp_sockfd == ucp_sockfd) {
+            sock_count++;
+        }
+    }
+
+    int result = 0;
+
+    // close the UCP socket if this is the last RCS socket bound to it
+    if (sock_count == 1) {
+        std::cout << "this is the last RCS sock bound to UCP sockfd " << ucp_sockfd << ". closing it" << std::endl;
+        result = ucpClose(ucp_sockfd);
+    }
 
     if (result == 0) {
         RCSSocket::g_rcs_sockets.erase(this->id);
@@ -111,6 +124,11 @@ void RCSSocket::send_ack() {
     ack->s_port = id;
     ack->d_port = remote_port;
     ack->set_akn(recv_seq_n);
+
+    if (state == RCS_STATE_CLOSE_WAIT || state == RCS_STATE_FIN_WAIT) {
+        ack->flags |= FLAG_FIN;
+    }
+
     int b_sent = 0;
     uint8_t *ack_buf = ack->serialize();
     while(b_sent != ack->size) {
@@ -320,9 +338,15 @@ Message *RCSSocket::recv(bool no_ack) {
 #endif
 
     remote_port = msg->s_port;
+
+    if (msg->is_fin()) {
+        state = RCS_STATE_CLOSE_WAIT;
+    }
+
     if(!no_ack) {
         send_ack();
     }
+
     recv_seq_n = !recv_seq_n;
 #ifdef DEBUG
     cout << "RECV SQN: " << +recv_seq_n << endl;
@@ -337,4 +361,38 @@ void RCSSocket::update_timeout(uint32_t rtt) {
 
 uint32_t RCSSocket::get_timeout() {
     return est_rtt * 2;
+}
+
+// waits for double the resend timeout in order to be confident that an
+// ack has been received
+void RCSSocket::timed_ack_wait() {
+    std::cout << "waiting for ack to be recieved" << std::endl;
+    while (true) {
+        try {
+            Message *resent_msg = get_msg(2 * get_timeout());
+            std::cout << "packet was resenti. resending ack" << std::endl;
+            resend_ack();
+            delete resent_msg;
+        } catch (RCSException e) {
+            std::cout << "done waiting" << std::endl;
+            break;
+        }
+    }
+}
+
+void RCSSocket::fin_wait() {
+    // throw out messages until we get a FIN
+    while (true) {
+        Message *fin = recv();
+
+        if (fin->is_fin()) {
+            state = RCS_STATE_TIME_WAIT;
+            delete fin;
+            break;
+        }
+
+        delete fin;
+    }
+
+    timed_ack_wait();
 }

@@ -89,12 +89,14 @@ int rcsAccept(int sockfd, struct sockaddr_in *addr) {
     }
 
     RCSSocket *rcs_sock = listen_sock->create_bound();
+    listen_sock->recv_seq_n = 0;
     rcs_sock->recv_seq_n = 1;
 
     Message *syn_ack = new Message(new char[0], 0, FLAG_SYN);
     rcs_sock->send_q.push_back(syn_ack);
 
     rcs_sock->flush_send_q(); // send SYN and wait for ACK
+    rcs_sock->state = RCS_STATE_ESTABLISHED;
 
     return rcs_sock->id;
 }
@@ -124,6 +126,9 @@ int rcsConnect(int sockfd, const struct sockaddr_in *addr) {
         assert(false);
     }
 
+    rcs_sock->timed_ack_wait();
+    rcs_sock->state = RCS_STATE_ESTABLISHED;
+
     return 0;
 }
 
@@ -134,6 +139,11 @@ int rcsRecv(int sockfd, void *buf, int len) {
         rcs_sock = RCSSocket::get(sockfd);
     } catch (RCSException e) {
         // set errno
+        return -1;
+    }
+
+    if (rcs_sock->state == RCS_STATE_CLOSE_WAIT) {
+        // dead peers tell no tales
         return -1;
     }
 
@@ -189,6 +199,13 @@ int rcsSend(int sockfd, void *buf, int len) {
         return -1;
     }
 
+    if (rcs_sock->state != RCS_STATE_ESTABLISHED &&
+        rcs_sock->state != RCS_STATE_CLOSE_WAIT) {
+
+        // set errno
+        return -1;
+    }
+
     int max_content_size = MAX_UCP_PACKET_SIZE - HEADER_SIZE;
 
     // The return value will be wrong if this isn't true
@@ -200,15 +217,41 @@ int rcsSend(int sockfd, void *buf, int len) {
         rcs_sock->send_q.push_back(msg);
     }
 
-    return rcs_sock->flush_send_q();
+    int send_status = rcs_sock->flush_send_q();
+
+    assert(send_status > 0);
+
+    return send_status;
 }
 
 int rcsClose(int sockfd) {
     RCSSocket *rcs_sock;
     try {
         rcs_sock = RCSSocket::get(sockfd);
-        rcs_sock->close();
     } catch (RCSException e) {
         return -1;
     }
+
+
+    std::cout << "sending FIN" << std::endl;
+    Message *fin = new Message(NULL, 0, FLAG_FIN);
+    rcs_sock->send_q.push_back(fin);
+    rcs_sock->flush_send_q();
+
+    if (rcs_sock->state == RCS_STATE_ESTABLISHED) {
+        // begin teardown by sending the first FIN and waiting
+        // can no longer send after this point
+        rcs_sock->state = RCS_STATE_FIN_WAIT;
+        std::cout << "close initiator waiting on fin" << std::endl;
+        rcs_sock->fin_wait();
+    } else if (rcs_sock->state != RCS_STATE_CLOSE_WAIT) {
+        // if we are in the CLOSE_WAIT state and got our message ack'ed,
+        // we may safely proceed to die
+
+        // set errno
+        return -1;
+    }
+
+    std::cout << "closing socket" << std::endl;
+    return rcs_sock->close();
 }

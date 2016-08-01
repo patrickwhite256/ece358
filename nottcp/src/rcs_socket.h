@@ -13,6 +13,10 @@
 #define RCS_STATE_SYN_SENT    2
 #define RCS_STATE_SYN_RECV    3
 #define RCS_STATE_ESTABLISHED 4
+#define RCS_STATE_FIN_WAIT    5
+#define RCS_STATE_CLOSE_WAIT  6
+#define RCS_STATE_TIME_WAIT   7
+#define RCS_STATE_CLOSED      8
 
 #define UCP_TIMEOUT_STEP_MS 10
 #define MAX_UCP_PACKET_SIZE 1000
@@ -55,6 +59,8 @@ struct RCSSocket {
     void assign_sockfd();
     Message *get_msg(uint32_t timeout = 0);
 
+    void timed_ack_wait();
+    void fin_wait();
     int close();
 
     static int create();

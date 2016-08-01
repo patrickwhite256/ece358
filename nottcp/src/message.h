@@ -3,6 +3,7 @@
 
 #define FLAG_ACK 0x01 // 0000 0001 -- acknowledgement of a message
 #define FLAG_SYN 0x02 // 0000 0010 -- synchronize request
+#define FLAG_FIN 0x04 // 0000 0100 -- close request
 #define FLAG_SQN 0x40 // 0100 0000 -- sequence number
 #define FLAG_AKN 0x80 // 1000 0000 -- ack sequence number
 
@@ -62,6 +63,7 @@ struct Message {
 
     bool is_ack();
     bool is_syn();
+    bool is_fin();
     uint8_t get_sqn();
     uint8_t get_akn();
     void set_sqn(uint8_t sqn);
