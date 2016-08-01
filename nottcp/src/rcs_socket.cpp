@@ -457,7 +457,7 @@ int RCSSocket::safe_ucp_send(const void *buf, int size) {
     }
 
     ucp_mutex->lock();
-    int ret = safe_ucp_send(buf, size);
+    int ret = ucpSendTo(ucp_sockfd, buf, size, cxn_addr);
     ucp_mutex->unlock();
     return ret;
 }
