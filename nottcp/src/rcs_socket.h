@@ -30,7 +30,6 @@ struct RCSSocket {
 
     int id;
     int ucp_sockfd;
-    int remote_port;
     uint8_t state;
     sockaddr_in *cxn_addr;
     std::deque<Message *> messages;
@@ -38,6 +37,7 @@ struct RCSSocket {
     char *data_buf;
     uint16_t data_buf_size;
     Message *last_ack = NULL;
+    RCSSocket *parent_sock = NULL;
 
     uint8_t send_seq_n = 0;
     uint8_t recv_seq_n = 0;
@@ -65,8 +65,9 @@ struct RCSSocket {
 
     static int create();
     static RCSSocket *get(int sockfd);
+    static RCSSocket *get_by_addr(sockaddr_in addr);
 };
 
-// TODO: destroy all sockets
+bool operator==(const sockaddr_in &lhs, const sockaddr_in &rhs);
 
 #endif

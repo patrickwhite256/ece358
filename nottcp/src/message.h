@@ -9,20 +9,16 @@
 
 #define CHECKSUM_SIZE   2 // 16 bits
 #define SIZE_SIZE       2 // 16 bits
-#define DPORT_SIZE      1 // 8 bits
-#define SPORT_SIZE      1 // 8 bits
 #define FLAGS_SIZE      1 // 8 bits
 #define RAND_SIZE       1 // 8 bits
 #define SEQN_SIZE       1 // 8 bits
 #define ACKN_SIZE       1 // 8 bits
 
-#define HEADER_SIZE (CHECKSUM_SIZE + SIZE_SIZE + DPORT_SIZE + SPORT_SIZE + FLAGS_SIZE + RAND_SIZE + SEQN_SIZE + ACKN_SIZE)
+#define HEADER_SIZE (CHECKSUM_SIZE + SIZE_SIZE + FLAGS_SIZE + RAND_SIZE + SEQN_SIZE + ACKN_SIZE)
 
 #define CHECKSUM_OFFSET 0
 #define SIZE_OFFSET     (CHECKSUM_OFFSET + CHECKSUM_SIZE)
-#define DPORT_OFFSET    (SIZE_OFFSET     + SIZE_SIZE)
-#define SPORT_OFFSET    (DPORT_OFFSET    + DPORT_SIZE)
-#define FLAGS_OFFSET    (SPORT_OFFSET    + SPORT_SIZE)
+#define FLAGS_OFFSET    (SIZE_OFFSET     + SIZE_SIZE)
 #define RAND_OFFSET     (FLAGS_OFFSET    + FLAGS_SIZE)
 #define SEQN_OFFSET     (RAND_OFFSET     + RAND_SIZE)
 #define ACKN_OFFSET     (SEQN_OFFSET     + SEQN_SIZE)
@@ -40,8 +36,6 @@
  * |-------------------------|
  * |   16-bit message size   |
  * |-------------------------|
- * |  dest port  | src port  |
- * |-------------------------|
  * | 8 flag bits | random #  |
  *  -------------------------
  * | seq #       | ack #     |
@@ -51,8 +45,6 @@
 struct Message {
     uint16_t checksum;
     uint8_t flags;
-    uint8_t s_port = 0;
-    uint8_t d_port = 0;
     uint8_t *header;
     uint8_t random;
     char *content;

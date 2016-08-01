@@ -21,8 +21,6 @@ void print_msg_data(Message *msg, bool send) {
         cout << action << "ing ack.     size:        " << +msg->size << endl;
     else
         cout << action << "ing data.    size:        " << +msg->size << endl;
-    cout << "                 source port: " << +msg->s_port << endl;
-    cout << "                 dest port:   " << +msg->d_port << endl;
     cout << "                 flags:       " << +msg->flags << endl;
     cout << "                 sequence #:  " << +msg->seq_n << endl;
     cout << "                 ack #:       " << +msg->ack_n << endl;
@@ -68,7 +66,9 @@ RCSSocket *RCSSocket::create_bound() {
 
     memcpy(rcs_sock->cxn_addr, cxn_addr, sizeof(struct sockaddr_in));
     rcs_sock->assign_sockfd();
-    rcs_sock->remote_port = remote_port;
+    rcs_sock->last_ack = last_ack;
+    last_ack = NULL;
+    rcs_sock->parent_sock = this;
 
     return rcs_sock;
 }
@@ -121,8 +121,6 @@ void RCSSocket::send_ack() {
     cout << "Sending ack." << endl;
 #endif
     Message *ack = new Message(NULL, 0, FLAG_ACK);
-    ack->s_port = id;
-    ack->d_port = remote_port;
     ack->set_akn(recv_seq_n);
 
     if (state == RCS_STATE_CLOSE_WAIT || state == RCS_STATE_FIN_WAIT) {
@@ -162,8 +160,6 @@ int RCSSocket::flush_send_q() {
     while(!send_q.empty()) {
         Message *msg = send_q.front();
 
-        msg->s_port = id;
-        msg->d_port = remote_port;
         msg->set_sqn(send_seq_n);
         const uint8_t *msg_buf = msg->serialize();
 
@@ -232,7 +228,8 @@ Message *RCSSocket::get_msg(uint32_t timeout) {
         while(true) {
             unsigned char msg_buf[MAX_UCP_PACKET_SIZE];
             ucpSetSockRecvTimeout(ucp_sockfd, UCP_TIMEOUT_STEP_MS);
-            int b_recv = ucpRecvFrom(ucp_sockfd, msg_buf, MAX_UCP_PACKET_SIZE, cxn_addr);
+            sockaddr_in *recv_addr = new sockaddr_in;
+            int b_recv = ucpRecvFrom(ucp_sockfd, msg_buf, MAX_UCP_PACKET_SIZE, recv_addr);
             if(b_recv < 0 && (errno == EWOULDBLOCK || errno == EAGAIN)){
                 // no more data
                 break;
@@ -251,15 +248,21 @@ Message *RCSSocket::get_msg(uint32_t timeout) {
                 throw;
             }
 
-            // is this data for someone else
-            if(state != RCS_STATE_LISTENING && msg->d_port != this->id){
-                //TODO: maybe invalid by now
-                RCSSocket *recipient = RCSSocket::get(msg->d_port);
+            // is this data for me
+            if(state == RCS_STATE_LISTENING || *recv_addr == *cxn_addr) {
+                messages.push_back(msg);
+            } else {
+                RCSSocket *recipient = RCSSocket::get_by_addr(*recv_addr);
+                if(recipient == NULL) recipient = parent_sock;
                 recipient->messages.push_back(msg);
-                continue; // get new message
             }
 
-            messages.push_back(msg);
+            if(state == RCS_STATE_LISTENING) {
+                cxn_addr = recv_addr;
+            } else{
+                delete recv_addr;
+            }
+
         }
 
         if(!messages.empty()) {
@@ -317,7 +320,7 @@ Message *RCSSocket::recv(bool no_ack) {
         if(msg->is_ack()) {
             // out of order ack. ignore, get new.
 #ifdef DEBUG
-            cout << "received out of order data, ignoring" << endl;
+            cout << "received out of order ack, ignoring" << endl;
 #endif
             assert(msg->get_akn() != send_seq_n);
             delete msg;
@@ -336,8 +339,6 @@ Message *RCSSocket::recv(bool no_ack) {
 #ifdef DEBUG
     cout << "Received data" << endl;
 #endif
-
-    remote_port = msg->s_port;
 
     if (msg->is_fin()) {
         state = RCS_STATE_CLOSE_WAIT;
@@ -395,4 +396,19 @@ void RCSSocket::fin_wait() {
     }
 
     timed_ack_wait();
+}
+
+RCSSocket *RCSSocket::get_by_addr(sockaddr_in addr) {
+    for (auto it = g_rcs_sockets.begin(); it != g_rcs_sockets.end(); ++it) {
+        if (*it->second->cxn_addr == addr) {
+            return it->second;
+        }
+    }
+    return NULL;
+}
+
+bool operator==(const sockaddr_in &lhs, const sockaddr_in &rhs) {
+    return lhs.sin_family == rhs.sin_family &&
+           lhs.sin_port == rhs.sin_port &&
+           rhs.sin_addr.s_addr == rhs.sin_addr.s_addr;
 }
