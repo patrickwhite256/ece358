@@ -3,6 +3,7 @@
 
 #define FLAG_ACK 0x01 // 0000 0001 -- acknowledgement of a message
 #define FLAG_SYN 0x02 // 0000 0010 -- synchronize request
+#define FLAG_FIN 0x04 // 0000 0100 -- close request
 #define FLAG_SQN 0x40 // 0100 0000 -- sequence number
 #define FLAG_AKN 0x80 // 1000 0000 -- ack sequence number
 
@@ -11,16 +12,21 @@
 #define DPORT_SIZE      1 // 8 bits
 #define SPORT_SIZE      1 // 8 bits
 #define FLAGS_SIZE      1 // 8 bits
+#define RAND_SIZE       1 // 8 bits
 
-#define HEADER_SIZE (CHECKSUM_SIZE + SIZE_SIZE + DPORT_SIZE + SPORT_SIZE + FLAGS_SIZE)
+#define HEADER_SIZE (CHECKSUM_SIZE + SIZE_SIZE + DPORT_SIZE + SPORT_SIZE + FLAGS_SIZE + RAND_SIZE)
 
 #define CHECKSUM_OFFSET 0
 #define SIZE_OFFSET     (CHECKSUM_OFFSET + CHECKSUM_SIZE)
 #define DPORT_OFFSET    (SIZE_OFFSET     + SIZE_SIZE)
 #define SPORT_OFFSET    (DPORT_OFFSET    + DPORT_SIZE)
 #define FLAGS_OFFSET    (SPORT_OFFSET    + SPORT_SIZE)
+#define RAND_OFFSET     (FLAGS_OFFSET    + FLAGS_SIZE)
 
 #include <cstdint>
+#include <cstdlib>
+
+#include "rcs_exception.h"
 
 
 /**
@@ -32,7 +38,7 @@
  * |-------------------------|
  * |  dest port  | src port  |
  * |-------------------------|
- * | 8 flag bits |           |
+ * | 8 flag bits | random #  |
  *  -------------------------
  */
 
@@ -42,6 +48,7 @@ struct Message {
     uint8_t s_port = 0;
     uint8_t d_port = 0;
     uint8_t *header;
+    uint8_t random;
     char *content;
     uint16_t size;
 
@@ -52,17 +59,17 @@ struct Message {
     void set_header();
     void set_checksum();
     uint8_t *serialize();
-    bool validate();
+    void validate();
 
     bool is_ack();
     bool is_syn();
+    bool is_fin();
     uint8_t get_sqn();
     uint8_t get_akn();
     void set_sqn(uint8_t sqn);
     void set_akn(uint8_t akn);
-};
 
-//TODO: static
-Message *deserialize(const uint8_t *buf, uint16_t buf_len);
+    static Message *deserialize(const uint8_t *buf, uint16_t buf_len);
+};
 
 #endif

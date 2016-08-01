@@ -46,6 +46,7 @@ void *serviceConnection(void *arg) {
 		if(recvlen > 0) {
 			printf("%lu received %d bytes.\n",
 				pthread_self(), recvlen);
+            printf("\n%s\n", buf);
 		}
 #endif
 
@@ -65,6 +66,7 @@ void *serviceConnection(void *arg) {
 			rcsClose(s);
 			return NULL;
 		}
+        memset(buf, 0, 256);
 	}
 
 #ifdef DEBUG

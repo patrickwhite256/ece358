@@ -17,6 +17,8 @@
 #include <errno.h>
 #include <strings.h>
 
+#include <stdlib.h>
+
 extern int errno;
 extern int mybind(int, struct sockaddr_in *);
 
@@ -62,7 +64,7 @@ int ucpSetSockRecvTimeout(int sockfd, int milliSecs)
 
 int ucpSendTo(int sockfd, const void *buf, int len, const struct sockaddr_in *to)
 {
-    const int pDoEvil = 0; /* Chance in 100 that we will do evil */
+    const int pDoEvil = 20; /* Chance in 100 that we will do evil */
 
     if(len <= 0) {
 	errno = EINVAL; /* Invalid arg */
@@ -81,15 +83,24 @@ int ucpSendTo(int sockfd, const void *buf, int len, const struct sockaddr_in *to
 	     *             2 -- don't send packet
 	     */
 	if(evilKind == 0) {
+#ifdef DEBUG
+        printf("EVIL: cutting off part of message\n");
+#endif
 	    len = get_rand()%len; /* Guaranteed to be < len */
 	}
 	else if(evilKind == 1) {
+#ifdef DEBUG
+        printf("EVIL: corrupting message\n");
+#endif
 	    int i;
 	    for(i = 0; i < len; i++) {
 		sendBuf[i] = (unsigned char)(get_rand()%256);
 	    }
 	}
 	else {
+#ifdef DEBUG
+        printf("EVIL: dropping message\n");
+#endif
 	    /* Pretend we send all the bytes when we don't */
 	    return len;
 	}
