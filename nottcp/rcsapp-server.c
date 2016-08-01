@@ -111,13 +111,12 @@ int main(int argc, char *argv[]) {
 		int *newasock = (int *)malloc(sizeof(int));
 		*newasock = asock;
 
-        serviceConnection(newasock);
-		/* int err; */
-		/* pthread_t t; */
-		/* if(err = pthread_create(&t, NULL, &serviceConnection, (void *)(newasock))) { */
-		/* 	fprintf(stderr, "pthread_create(): %s\n", strerror(err)); */
-		/* 	exit(1); */
-		/* } */
+		int err;
+		pthread_t t;
+		if((err = pthread_create(&t, NULL, &serviceConnection, (void *)(newasock)))) {
+			fprintf(stderr, "pthread_create(): %s\n", strerror(err));
+			exit(1);
+		}
 	}
 
 	return 0;

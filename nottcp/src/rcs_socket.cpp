@@ -267,11 +267,9 @@ Message *RCSSocket::get_msg(uint32_t timeout) {
             // is this data for me
             if(state == RCS_STATE_LISTENING || *recv_addr == *cxn_addr) {
                 safe_message_push(msg);
-                messages.push_back(msg);
             } else {
                 RCSSocket *recipient = RCSSocket::get_by_addr(*recv_addr);
                 if(recipient == NULL) recipient = parent_sock;
-                recipient->messages.push_back(msg);
                 recipient->safe_message_push(msg);
             }
 
@@ -477,7 +475,7 @@ int RCSSocket::safe_ucp_send(const void *buf, int size) {
     }
 
     ucp_mutex->lock();
-    int ret = safe_ucp_send(buf, size);
+    int ret = ucpSendTo(ucp_sockfd, buf, size, cxn_addr);
     ucp_mutex->unlock();
     return ret;
 }
