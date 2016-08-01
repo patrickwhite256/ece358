@@ -13,8 +13,10 @@
 #define SPORT_SIZE      1 // 8 bits
 #define FLAGS_SIZE      1 // 8 bits
 #define RAND_SIZE       1 // 8 bits
+#define SEQN_SIZE       1 // 8 bits
+#define ACKN_SIZE       1 // 8 bits
 
-#define HEADER_SIZE (CHECKSUM_SIZE + SIZE_SIZE + DPORT_SIZE + SPORT_SIZE + FLAGS_SIZE + RAND_SIZE)
+#define HEADER_SIZE (CHECKSUM_SIZE + SIZE_SIZE + DPORT_SIZE + SPORT_SIZE + FLAGS_SIZE + RAND_SIZE + SEQN_SIZE + ACKN_SIZE)
 
 #define CHECKSUM_OFFSET 0
 #define SIZE_OFFSET     (CHECKSUM_OFFSET + CHECKSUM_SIZE)
@@ -22,6 +24,8 @@
 #define SPORT_OFFSET    (DPORT_OFFSET    + DPORT_SIZE)
 #define FLAGS_OFFSET    (SPORT_OFFSET    + SPORT_SIZE)
 #define RAND_OFFSET     (FLAGS_OFFSET    + FLAGS_SIZE)
+#define SEQN_OFFSET     (RAND_OFFSET     + RAND_SIZE)
+#define ACKN_OFFSET     (SEQN_OFFSET     + SEQN_SIZE)
 
 #include <cstdint>
 #include <cstdlib>
@@ -40,6 +44,8 @@
  * |-------------------------|
  * | 8 flag bits | random #  |
  *  -------------------------
+ * | seq #       | ack #     |
+ *  -------------------------
  */
 
 struct Message {
@@ -51,6 +57,8 @@ struct Message {
     uint8_t random;
     char *content;
     uint16_t size;
+    uint8_t seq_n;
+    uint8_t ack_n;
 
     Message(const char *msg_content, uint16_t content_size, uint8_t flags);
     ~Message();

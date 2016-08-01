@@ -126,7 +126,6 @@ int rcsConnect(int sockfd, const struct sockaddr_in *addr) {
         assert(false);
     }
 
-    rcs_sock->timed_ack_wait();
     rcs_sock->state = RCS_STATE_ESTABLISHED;
 
     return 0;

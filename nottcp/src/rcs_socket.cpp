@@ -24,8 +24,8 @@ void print_msg_data(Message *msg, bool send) {
     cout << "                 source port: " << +msg->s_port << endl;
     cout << "                 dest port:   " << +msg->d_port << endl;
     cout << "                 flags:       " << +msg->flags << endl;
-    cout << "                 sequence #:  " << +(msg->flags & FLAG_SQN) << endl;
-    cout << "                 ack #:       " << +(msg->flags & FLAG_AKN) << endl;
+    cout << "                 sequence #:  " << +msg->seq_n << endl;
+    cout << "                 ack #:       " << +msg->ack_n << endl;
     cout << "                 checksum:    " << msg->checksum << endl;
 }
 
@@ -214,7 +214,7 @@ int RCSSocket::flush_send_q() {
 
         sent += msg->get_content_size();
 
-        send_seq_n = !send_seq_n;
+        send_seq_n++;
 #ifdef DEBUG
         cout << "SEND SQN: " << +send_seq_n << endl;
 #endif
@@ -347,7 +347,7 @@ Message *RCSSocket::recv(bool no_ack) {
         send_ack();
     }
 
-    recv_seq_n = !recv_seq_n;
+    recv_seq_n++;
 #ifdef DEBUG
     cout << "RECV SQN: " << +recv_seq_n << endl;
 #endif
