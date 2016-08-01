@@ -71,8 +71,6 @@ void Message::set_header() {
     header[SIZE_OFFSET + 1] = size & 0xff;
 
     header[FLAGS_OFFSET] = flags;
-    header[DPORT_OFFSET] = d_port;
-    header[SPORT_OFFSET] = s_port;
     header[RAND_OFFSET] = random;
     header[SEQN_OFFSET] = seq_n;
     header[ACKN_OFFSET] = ack_n;
@@ -185,8 +183,6 @@ Message *Message::deserialize(const uint8_t *buf, uint16_t buf_len) {
 
     uint16_t checksum = (buf[CHECKSUM_OFFSET] << 8) + buf[CHECKSUM_OFFSET + 1];
     uint8_t flags = buf[FLAGS_OFFSET];
-    uint8_t dport = buf[DPORT_OFFSET];
-    uint8_t sport = buf[SPORT_OFFSET];
     uint8_t random = buf[RAND_OFFSET];
     uint8_t sqn = buf[SEQN_OFFSET];
     uint8_t akn = buf[ACKN_OFFSET];
@@ -200,8 +196,6 @@ Message *Message::deserialize(const uint8_t *buf, uint16_t buf_len) {
     memcpy(content, &buf[HEADER_SIZE], content_size);
 
     Message *ret = new Message(content, content_size, flags);
-    ret->d_port = dport;
-    ret->s_port = sport;
     ret->checksum = checksum;
     ret->random = random;
     ret->seq_n = sqn;
