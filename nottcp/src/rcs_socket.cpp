@@ -5,6 +5,7 @@
 #include <cstring>
 #include <cassert>
 #include <iostream>
+#include <mutex>
 
 #include <sys/timeb.h>
 
@@ -12,7 +13,7 @@ using namespace std;
 
 int RCSSocket::g_rcs_sock_counter = 0;
 map<int, RCSSocket *> RCSSocket::g_rcs_sockets;
-
+map<int, std::mutex *> RCSSocket::g_ucp_sock_mutexes;
 
 void print_msg_data(Message *msg, bool send) {
     const char * action = "send";
@@ -53,6 +54,8 @@ void RCSSocket::assign_sockfd() {
 int RCSSocket::create() {
     RCSSocket *rcs_sock = new RCSSocket(ucpSocket());
 
+    g_ucp_sock_mutexes.insert(pair<int, std::mutex *>(rcs_sock->ucp_sockfd, new std::mutex()));
+
     rcs_sock->assign_sockfd();
 
     return rcs_sock->id;
@@ -70,6 +73,14 @@ RCSSocket *RCSSocket::create_bound() {
     rcs_sock->assign_sockfd();
     rcs_sock->remote_port = remote_port;
 
+    try {
+        rcs_sock->get_ucp_mutex();
+    } catch (RCSException e) {
+        if (e.err_code == RCS_ERROR_NO_MUTEX) {
+            g_ucp_sock_mutexes.insert(pair<int, std::mutex *>(rcs_sock->ucp_sockfd, new std::mutex()));
+        }
+    }
+
     return rcs_sock;
 }
 
@@ -81,7 +92,7 @@ RCSSocket *RCSSocket::create_bound() {
 int RCSSocket::close() {
     // count the number of RCS sockets that are bound to the same ucp socket as this one
     int sock_count = 0;
-    for (std::map<int, RCSSocket*>::iterator it = g_rcs_sockets.begin(); it != g_rcs_sockets.end(); ++it) {
+    for (auto it = g_rcs_sockets.begin(); it != g_rcs_sockets.end(); ++it) {
         if (it->second->ucp_sockfd == ucp_sockfd) {
             sock_count++;
         }
@@ -91,7 +102,10 @@ int RCSSocket::close() {
 
     // close the UCP socket if this is the last RCS socket bound to it
     if (sock_count == 1) {
+#ifdef DEBUG
         std::cout << "this is the last RCS sock bound to UCP sockfd " << ucp_sockfd << ". closing it" << std::endl;
+#endif
+        g_ucp_sock_mutexes.erase(ucp_sockfd);
         result = ucpClose(ucp_sockfd);
     }
 
@@ -135,7 +149,7 @@ void RCSSocket::send_ack() {
 #ifdef VERBOSE
         print_msg_data(ack, true);
 #endif
-        b_sent = ucpSendTo(ucp_sockfd, ack_buf, ack->size, cxn_addr);
+        b_sent = safe_ucp_send(ack_buf, ack->size);
     }
 
     if(last_ack != NULL) delete last_ack;
@@ -152,7 +166,7 @@ void RCSSocket::resend_ack() {
 #ifdef VERBOSE
         print_msg_data(last_ack, true);
 #endif
-        b_sent = ucpSendTo(ucp_sockfd, ack_buf, last_ack->size, cxn_addr);
+        b_sent = safe_ucp_send(ack_buf, last_ack->size);
     }
 }
 
@@ -174,7 +188,7 @@ int RCSSocket::flush_send_q() {
         cout << "Sending data." << endl;
 #endif
 
-        int b_sent = ucpSendTo(ucp_sockfd, msg_buf, msg->size, cxn_addr);
+        int b_sent = safe_ucp_send(msg_buf, msg->size);
         if(b_sent != msg->size) {
             // incomplete packet sent; retry
 #ifdef DEBUG
@@ -232,7 +246,7 @@ Message *RCSSocket::get_msg(uint32_t timeout) {
         while(true) {
             unsigned char msg_buf[MAX_UCP_PACKET_SIZE];
             ucpSetSockRecvTimeout(ucp_sockfd, UCP_TIMEOUT_STEP_MS);
-            int b_recv = ucpRecvFrom(ucp_sockfd, msg_buf, MAX_UCP_PACKET_SIZE, cxn_addr);
+            int b_recv = safe_ucp_recv(msg_buf, MAX_UCP_PACKET_SIZE);
             if(b_recv < 0 && (errno == EWOULDBLOCK || errno == EAGAIN)){
                 // no more data
                 break;
@@ -255,16 +269,16 @@ Message *RCSSocket::get_msg(uint32_t timeout) {
             if(state != RCS_STATE_LISTENING && msg->d_port != this->id){
                 //TODO: maybe invalid by now
                 RCSSocket *recipient = RCSSocket::get(msg->d_port);
-                recipient->messages.push_back(msg);
+                recipient->safe_message_push(msg);
                 continue; // get new message
             }
 
-            messages.push_back(msg);
+            safe_message_push(msg);
         }
 
-        if(!messages.empty()) {
-            Message *msg = messages.front();
-            messages.pop_front();
+        if(!safe_messages_empty()) {
+            Message *msg = safe_message_front();
+            safe_message_pop();
 #ifdef VERBOSE
             print_msg_data(msg, false);
 #endif
@@ -395,4 +409,70 @@ void RCSSocket::fin_wait() {
     }
 
     timed_ack_wait();
+}
+
+Message *RCSSocket::safe_message_front() {
+    messages_mutex.lock();
+    Message *front = messages.front();
+    messages_mutex.unlock();
+    return front;
+}
+
+void RCSSocket::safe_message_pop() {
+    messages_mutex.lock();
+    messages.pop_front();
+    messages_mutex.unlock();
+}
+
+void RCSSocket::safe_message_push(Message *msg) {
+    messages_mutex.lock();
+    messages.push_back(msg);
+    messages_mutex.unlock();
+}
+
+bool RCSSocket::safe_messages_empty() {
+    messages_mutex.lock();
+    bool empty = messages.empty();
+    messages_mutex.unlock();
+    return empty;
+}
+
+std::mutex *RCSSocket::get_ucp_mutex() {
+    auto mutexiter = RCSSocket::g_ucp_sock_mutexes.find(ucp_sockfd);
+
+    if (mutexiter == RCSSocket::g_ucp_sock_mutexes.end()) {
+        throw RCSException(RCS_ERROR_NO_MUTEX);
+    }
+
+    return mutexiter->second;
+}
+
+int RCSSocket::safe_ucp_send(const void *buf, int size) {
+    std::mutex *ucp_mutex;
+
+    try {
+        ucp_mutex = get_ucp_mutex();
+    } catch (RCSException e) {
+        return -1;
+    }
+
+    ucp_mutex->lock();
+    int ret = ucpSendTo(ucp_sockfd, buf, size, cxn_addr);
+    ucp_mutex->unlock();
+    return ret;
+}
+
+int RCSSocket::safe_ucp_recv(void *buf, int size) {
+    std::mutex *ucp_mutex;
+
+    try {
+        ucp_mutex = get_ucp_mutex();
+    } catch (RCSException e) {
+        return -1;
+    }
+
+    ucp_mutex->lock();
+    int ret = ucpRecvFrom(ucp_sockfd, buf, size, cxn_addr);
+    ucp_mutex->unlock();
+    return ret;
 }

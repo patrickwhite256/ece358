@@ -13,5 +13,6 @@ struct RCSException {
 #define RCS_ERROR_TIMEOUT          2
 #define RCS_ERROR_CORRUPT          3
 #define RCS_ERROR_RESEND           4
+#define RCS_ERROR_NO_MUTEX         5
 
 #endif
