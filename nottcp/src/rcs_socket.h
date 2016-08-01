@@ -33,7 +33,7 @@ struct RCSSocket {
     int id;
     int ucp_sockfd;
     uint8_t state;
-    sockaddr_in *cxn_addr;
+    sockaddr_in *cxn_addr = NULL;
     std::deque<Message *> messages;
     std::deque<Message *> send_q;
     std::mutex messages_mutex;
@@ -46,8 +46,8 @@ struct RCSSocket {
     uint8_t recv_seq_n = 0;
     uint32_t est_rtt = INITIAL_TIMEOUT;
 
-    RCSSocket() : state(RCS_STATE_NEW), cxn_addr(new sockaddr_in), data_buf_size(0) {}
-    RCSSocket(int sockfd) : ucp_sockfd(sockfd), state(RCS_STATE_NEW), cxn_addr(new sockaddr_in), data_buf_size(0) {}
+    RCSSocket() : state(RCS_STATE_NEW), data_buf_size(0) {}
+    RCSSocket(int sockfd) : ucp_sockfd(sockfd), state(RCS_STATE_NEW), data_buf_size(0) {}
     ~RCSSocket() { delete cxn_addr; }
 
     int flush_send_q();

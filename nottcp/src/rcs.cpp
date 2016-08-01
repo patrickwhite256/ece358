@@ -111,6 +111,7 @@ int rcsConnect(int sockfd, const struct sockaddr_in *addr) {
         return -1;
     }
 
+    rcs_sock->cxn_addr = new sockaddr_in;
     memcpy(rcs_sock->cxn_addr, addr, sizeof(sockaddr_in));
 
     // TODO: give up eventually

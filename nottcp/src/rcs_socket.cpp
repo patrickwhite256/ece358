@@ -67,7 +67,8 @@ int RCSSocket::create() {
 RCSSocket *RCSSocket::create_bound() {
     RCSSocket *rcs_sock = new RCSSocket(ucp_sockfd);
 
-    memcpy(rcs_sock->cxn_addr, cxn_addr, sizeof(struct sockaddr_in));
+    rcs_sock->cxn_addr = cxn_addr;
+    cxn_addr = NULL;
     rcs_sock->assign_sockfd();
     rcs_sock->last_ack = last_ack;
     last_ack = NULL;
@@ -155,6 +156,7 @@ void RCSSocket::send_ack() {
 }
 
 void RCSSocket::resend_ack() {
+    if(last_ack == NULL) return;
 #ifdef DEBUG
     cout << "Resending ack." << endl;
 #endif
@@ -264,21 +266,18 @@ Message *RCSSocket::get_msg(uint32_t timeout) {
                 throw;
             }
 
-            // is this data for me
-            if(state == RCS_STATE_LISTENING || *recv_addr == *cxn_addr) {
-                safe_message_push(msg);
-            } else {
-                RCSSocket *recipient = RCSSocket::get_by_addr(*recv_addr);
-                if(recipient == NULL) recipient = parent_sock;
-                recipient->safe_message_push(msg);
-            }
-
-            if(state == RCS_STATE_LISTENING) {
+            RCSSocket *recipient = RCSSocket::get_by_addr(*recv_addr);
+            if(recipient == NULL and state == RCS_STATE_LISTENING) {
+                recipient = this;
                 cxn_addr = recv_addr;
-            } else{
+            } else if(recipient == NULL) {
+                recipient = parent_sock;
+                delete recv_addr;
+            } else {
                 delete recv_addr;
             }
 
+            recipient->safe_message_push(msg);
         }
 
         if(!safe_messages_empty()) {
@@ -416,7 +415,8 @@ void RCSSocket::fin_wait() {
 
 RCSSocket *RCSSocket::get_by_addr(sockaddr_in addr) {
     for (auto it = g_rcs_sockets.begin(); it != g_rcs_sockets.end(); ++it) {
-        if (*it->second->cxn_addr == addr) {
+        const sockaddr_in *cxn_addr = it->second->cxn_addr;
+        if (cxn_addr != NULL && *cxn_addr == addr) {
             return it->second;
         }
     }
