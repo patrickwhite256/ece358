@@ -7,6 +7,7 @@
 #include <deque>
 #include <map>
 #include <netinet/in.h>
+#include <mutex>
 
 #define RCS_STATE_NEW         0
 #define RCS_STATE_LISTENING   1
@@ -27,6 +28,7 @@
 struct RCSSocket {
     static int g_rcs_sock_counter;
     static std::map<int, RCSSocket *> g_rcs_sockets;
+    static std::map<int, std::mutex *>  g_ucp_sock_mutexes;
 
     int id;
     int ucp_sockfd;
@@ -34,6 +36,7 @@ struct RCSSocket {
     sockaddr_in *cxn_addr;
     std::deque<Message *> messages;
     std::deque<Message *> send_q;
+    std::mutex messages_mutex;
     char *data_buf;
     uint16_t data_buf_size;
     Message *last_ack = NULL;
@@ -58,6 +61,15 @@ struct RCSSocket {
     void resend_ack();
     void assign_sockfd();
     Message *get_msg(uint32_t timeout = 0);
+
+    Message *safe_message_front();
+    void safe_message_pop();
+    void safe_message_push(Message *msg);
+    bool safe_messages_empty();
+
+    std::mutex *get_ucp_mutex();
+    int safe_ucp_send(const void *buf, int size);
+    int safe_ucp_recv(void *buf, int size, sockaddr_in *recv_addr);
 
     void timed_ack_wait();
     void fin_wait();
