@@ -44,7 +44,7 @@ void *serviceConnection(void *arg) {
 	while((recvlen = rcsRecv(s, buf, 256)) >= 0) {
 #ifdef DEBUG
 		if(recvlen > 0) {
-			printf("%lu received %d bytes.\n",
+			printf("%lu received %ld bytes.\n",
 				pthread_self(), recvlen);
             printf("\n%s\n", buf);
 		}
@@ -110,10 +110,10 @@ int main(int argc, char *argv[]) {
 	while((asock = rcsAccept(s, (struct sockaddr_in *)&a)) > 0) {
 		int *newasock = (int *)malloc(sizeof(int));
 		*newasock = asock;
-		int err;
-		pthread_t t;
 
         serviceConnection(newasock);
+		/* int err; */
+		/* pthread_t t; */
 		/* if(err = pthread_create(&t, NULL, &serviceConnection, (void *)(newasock))) { */
 		/* 	fprintf(stderr, "pthread_create(): %s\n", strerror(err)); */
 		/* 	exit(1); */

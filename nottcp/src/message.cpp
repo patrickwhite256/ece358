@@ -74,6 +74,8 @@ void Message::set_header() {
     header[DPORT_OFFSET] = d_port;
     header[SPORT_OFFSET] = s_port;
     header[RAND_OFFSET] = random;
+    header[SEQN_OFFSET] = seq_n;
+    header[ACKN_OFFSET] = ack_n;
 }
 
 /**
@@ -156,21 +158,19 @@ bool Message::is_fin() {
 }
 
 uint8_t Message::get_sqn() {
-    return (flags & FLAG_SQN) > 0;
+    return seq_n;
 }
 
 uint8_t Message::get_akn() {
-    return (flags & FLAG_AKN) > 0;
+    return ack_n;
 }
 
 void Message::set_sqn(uint8_t sqn) {
-    if(sqn == 1) flags |= FLAG_SQN;
-    else flags &= ~FLAG_SQN;
+    seq_n = sqn;
 }
 
 void Message::set_akn(uint8_t akn) {
-    if(akn == 1) flags |= FLAG_AKN;
-    else flags &= ~FLAG_AKN;
+    ack_n = akn;
 }
 
 /**
@@ -188,6 +188,8 @@ Message *Message::deserialize(const uint8_t *buf, uint16_t buf_len) {
     uint8_t dport = buf[DPORT_OFFSET];
     uint8_t sport = buf[SPORT_OFFSET];
     uint8_t random = buf[RAND_OFFSET];
+    uint8_t sqn = buf[SEQN_OFFSET];
+    uint8_t akn = buf[ACKN_OFFSET];
     uint16_t size = (buf[SIZE_OFFSET] << 8) + buf[SIZE_OFFSET + 1];
     if(buf_len < size) {
         throw RCSException(RCS_ERROR_CORRUPT);
@@ -202,6 +204,8 @@ Message *Message::deserialize(const uint8_t *buf, uint16_t buf_len) {
     ret->s_port = sport;
     ret->checksum = checksum;
     ret->random = random;
+    ret->seq_n = sqn;
+    ret->ack_n = akn;
 
     delete[] content;
 
