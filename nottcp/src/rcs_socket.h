@@ -29,17 +29,32 @@ struct RCSSocket {
     static int g_rcs_sock_counter;
     static std::map<int, RCSSocket *> g_rcs_sockets;
     static std::map<int, std::mutex *>  g_ucp_sock_mutexes;
+    static int create();
+    static RCSSocket *get(int sockfd);
+    static RCSSocket *get_by_addr(sockaddr_in addr);
 
     int id;
     int ucp_sockfd;
     uint8_t state;
+
+    // the address of the connected remote
     sockaddr_in *cxn_addr = NULL;
+
+    // the receive queue for this socket
     std::deque<Message *> messages;
-    std::deque<Message *> send_q;
     std::mutex messages_mutex;
+
+    // the send queue for this socket
+    std::deque<Message *> send_q;
+
+    // buffered segments
     char *data_buf;
     uint16_t data_buf_size;
+
+    // the last ack that was sent
     Message *last_ack = NULL;
+
+    // the parent sock to thi one, or null
     RCSSocket *parent_sock = NULL;
 
     uint8_t send_seq_n = 0;
@@ -50,34 +65,31 @@ struct RCSSocket {
     RCSSocket(int sockfd) : ucp_sockfd(sockfd), state(RCS_STATE_NEW), data_buf_size(0) {}
     ~RCSSocket() { delete cxn_addr; if(last_ack) delete last_ack; }
 
+    // externally used functions
     int flush_send_q();
     Message *recv(bool no_ack = false);
     RCSSocket *create_bound();
     uint32_t get_timeout();
+    void fin_wait();
+    int close();
 
+    // internally used functions
     void update_timeout(uint32_t rtt);
     void send_ack();
     void recv_ack();
     void resend_ack();
     void assign_sockfd();
     Message *get_msg(uint32_t timeout = 0);
+    void timed_ack_wait();
 
+    // thread safety methods
     Message *safe_message_front();
     void safe_message_pop();
     void safe_message_push(Message *msg);
     bool safe_messages_empty();
-
     std::mutex *get_ucp_mutex();
     int safe_ucp_send(const void *buf, int size);
     int safe_ucp_recv(void *buf, int size, sockaddr_in *recv_addr);
-
-    void timed_ack_wait();
-    void fin_wait();
-    int close();
-
-    static int create();
-    static RCSSocket *get(int sockfd);
-    static RCSSocket *get_by_addr(sockaddr_in addr);
 };
 
 bool operator==(const sockaddr_in &lhs, const sockaddr_in &rhs);

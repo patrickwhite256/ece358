@@ -19,8 +19,7 @@
 #define CHECKSUM_OFFSET 0
 #define SIZE_OFFSET     (CHECKSUM_OFFSET + CHECKSUM_SIZE)
 #define FLAGS_OFFSET    (SIZE_OFFSET     + SIZE_SIZE)
-#define RAND_OFFSET     (FLAGS_OFFSET    + FLAGS_SIZE)
-#define SEQN_OFFSET     (RAND_OFFSET     + RAND_SIZE)
+#define SEQN_OFFSET     (FLAGS_OFFSET    + FLAGS_SIZE)
 #define ACKN_OFFSET     (SEQN_OFFSET     + SEQN_SIZE)
 
 #include <cstdint>
@@ -37,23 +36,22 @@
  * |-------------------------|
  * |   16-bit message size   |
  * |-------------------------|
- * | 8 flag bits | random #  |
+ * | 8 flag bits | seq #     |
  *  -------------------------
- * | seq #       | ack #     |
+ * | ack #       |           |
  *  -------------------------
  */
 
 struct Message {
     uint16_t checksum;
     uint8_t flags;
-    uint8_t *header;
-    uint8_t random;
-    char *content;
     uint16_t size;
     uint8_t seq_n;
     uint8_t ack_n;
 
-    sockaddr_in *sender = NULL;
+    sockaddr_in *sender;
+    uint8_t *header;
+    char *content;
 
     Message(const char *msg_content, uint16_t content_size, uint8_t flags);
     ~Message();

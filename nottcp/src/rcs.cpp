@@ -4,7 +4,6 @@
  */
 #include <cstring>
 #include <cassert>
-#include <iostream>
 #include <algorithm>
 
 #include "errno.h"
@@ -117,7 +116,6 @@ int rcsConnect(int sockfd, const struct sockaddr_in *addr) {
     rcs_sock->cxn_addr = new sockaddr_in;
     memcpy(rcs_sock->cxn_addr, addr, sizeof(sockaddr_in));
 
-    // TODO: give up eventually
     Message *syn = new Message(NULL, 0, FLAG_SYN);
     rcs_sock->send_q.push_back(syn);
     rcs_sock->flush_send_q();
@@ -236,7 +234,6 @@ int rcsClose(int sockfd) {
     }
 
 
-    std::cout << "sending FIN" << std::endl;
     Message *fin = new Message(NULL, 0, FLAG_FIN);
     rcs_sock->send_q.push_back(fin);
     rcs_sock->flush_send_q();
@@ -245,7 +242,6 @@ int rcsClose(int sockfd) {
         // begin teardown by sending the first FIN and waiting
         // can no longer send after this point
         rcs_sock->state = RCS_STATE_FIN_WAIT;
-        std::cout << "close initiator waiting on fin" << std::endl;
         rcs_sock->fin_wait();
     } else if (rcs_sock->state != RCS_STATE_CLOSE_WAIT) {
         // if we are in the CLOSE_WAIT state and got our message ack'ed,
@@ -255,7 +251,6 @@ int rcsClose(int sockfd) {
         return -1;
     }
 
-    std::cout << "closing socket" << std::endl;
     int ret_val = rcs_sock->close();
     delete rcs_sock;
     return ret_val;

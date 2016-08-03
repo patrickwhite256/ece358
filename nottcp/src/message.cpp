@@ -1,7 +1,27 @@
 #include <cstring>
-#include <iostream>
 
 #include "message.h"
+
+Message::Message(const char *msg_content, uint16_t content_size, uint8_t msg_flags) {
+    content = new char[content_size];
+    if(msg_content != NULL) {
+        memcpy(content, msg_content, content_size);
+    }
+    flags = msg_flags;
+    size = HEADER_SIZE + content_size;
+
+    checksum = 0;
+    seq_n = 0;
+    ack_n = 0;
+    header = NULL;
+    sender = NULL;
+}
+
+Message::~Message() {
+    delete[] content;
+    if(header) delete[] header;
+    if(sender) delete sender;
+}
 
 // Calculates a 16-bit 1's complement checksum over an arbitrary byte buffer
 uint16_t compute_checksum(uint8_t *buf, uint16_t size) {
@@ -30,28 +50,6 @@ uint16_t compute_checksum(uint8_t *buf, uint16_t size) {
     return (uint16_t)(~checksum_accumulator & 0xffff);
 }
 
-
-Message::Message(const char *msg_content, uint16_t content_size, uint8_t msg_flags) {
-    content = new char[content_size];
-    if(msg_content != NULL) {
-        memcpy(content, msg_content, content_size);
-    }
-    flags = msg_flags;
-    size = HEADER_SIZE + content_size;
-
-    checksum = 0;
-    seq_n = 0;
-    ack_n = 0;
-    random = rand();
-    header = NULL;
-}
-
-Message::~Message() {
-    delete[] content;
-    if(header) delete[] header;
-    if(sender) delete sender;
-}
-
 uint16_t Message::get_content_size() {
     return size - HEADER_SIZE;
 }
@@ -76,7 +74,6 @@ void Message::set_header() {
     header[SIZE_OFFSET + 1] = size & 0xff;
 
     header[FLAGS_OFFSET] = flags;
-    header[RAND_OFFSET] = random;
     header[SEQN_OFFSET] = seq_n;
     header[ACKN_OFFSET] = ack_n;
 }
@@ -188,7 +185,6 @@ Message *Message::deserialize(const uint8_t *buf, uint16_t buf_len) {
 
     uint16_t checksum = (buf[CHECKSUM_OFFSET] << 8) + buf[CHECKSUM_OFFSET + 1];
     uint8_t flags = buf[FLAGS_OFFSET];
-    uint8_t random = buf[RAND_OFFSET];
     uint8_t sqn = buf[SEQN_OFFSET];
     uint8_t akn = buf[ACKN_OFFSET];
     uint16_t size = (buf[SIZE_OFFSET] << 8) + buf[SIZE_OFFSET + 1];
@@ -202,7 +198,6 @@ Message *Message::deserialize(const uint8_t *buf, uint16_t buf_len) {
 
     Message *ret = new Message(content, content_size, flags);
     ret->checksum = checksum;
-    ret->random = random;
     ret->seq_n = sqn;
     ret->ack_n = akn;
 

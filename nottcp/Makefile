@@ -1,9 +1,7 @@
 CXX=g++
-DEBUG ?= -DDEBUG
-VERBOSE ?= -DVERBOSE
-CXXFLAGS= -g -Wall $(DEBUG) $(VERBOSE) -std=c++11
+CXXFLAGS= -g -Wall -std=c++11
 LDFLAGS = -pthread
-EXECS=message-test rcsapp-client rcsapp-server
+EXECS=rcsapp-client rcsapp-server
 BIN_DIR=bin
 
 _EXECS=$(patsubst %,$(BIN_DIR)/%, $(EXECS))
@@ -47,9 +45,6 @@ build/%.d: src/%.cpp
 ####################################################################
 ########################     EXECS     #############################
 ####################################################################
-
-$(BIN_DIR)/message-test: build/message.o build/message_test.o
-	$(CXX) $(CXXFLAGS) $(LDFLAGS) $^ -o $@
 
 $(BIN_DIR)/rcsapp-client: build/rcsapp-client.o $(UCP_OBJS) $(RCS_OBJS)
 	$(CXX) $(CXXFLAGS) $(LDFLAGS) $^ -o $@
