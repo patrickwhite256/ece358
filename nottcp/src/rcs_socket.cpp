@@ -291,18 +291,10 @@ Message *RCSSocket::get_msg(uint32_t timeout) {
 
         if(!safe_messages_empty()) {
             Message *msg = safe_message_front();
-            if(state == RCS_STATE_LISTENING) {
-                cout << "here" << endl;
-                cxn_addr = msg->sender;
-                cout << "msg->sender->sin_port: " << ntohs(msg->sender->sin_port) << " cs: " << msg->checksum  << endl;
-                cout << "cxn_addr->sin_port: " << ntohs(cxn_addr->sin_port) << " cs: " << msg->checksum  << endl;
-                msg->sender = NULL;
-            }
-
-            safe_message_pop();
 #ifdef VERBOSE
             print_msg_data(msg, false);
 #endif
+            safe_message_pop();
             return msg;
         }
         if(timeout > 0) {
@@ -329,6 +321,14 @@ void RCSSocket::recv_ack() {
             resend_ack();
             delete msg;
             continue; // get new packet
+        }
+
+        if(state == RCS_STATE_LISTENING) {
+            cout << "here" << endl;
+            cxn_addr = msg->sender;
+            cout << "msg->sender->sin_port: " << ntohs(msg->sender->sin_port) << " cs: " << msg->checksum  << endl;
+            cout << "cxn_addr->sin_port: " << ntohs(cxn_addr->sin_port) << " cs: " << msg->checksum  << endl;
+            msg->sender = NULL;
         }
         break; // in order ack
     }
@@ -366,6 +366,14 @@ Message *RCSSocket::recv(bool no_ack) {
             delete msg;
             continue; // get new packet
         }
+
+        if(state == RCS_STATE_LISTENING) {
+            cout << "here" << endl;
+            cxn_addr = msg->sender;
+            cout << "msg->sender->sin_port: " << ntohs(msg->sender->sin_port) << " cs: " << msg->checksum  << endl;
+            cout << "cxn_addr->sin_port: " << ntohs(cxn_addr->sin_port) << " cs: " << msg->checksum  << endl;
+            msg->sender = NULL;
+        }
         break; // in order data
     }
 #ifdef DEBUG
@@ -402,7 +410,7 @@ void RCSSocket::timed_ack_wait() {
     std::cout << "waiting for ack to be recieved" << std::endl;
     while (true) {
         try {
-            Message *resent_msg = get_msg(2 * get_timeout());
+            Message *resent_msg = get_msg(4 * get_timeout());
             std::cout << "packet was resenti. resending ack" << std::endl;
             resend_ack();
             delete resent_msg;
