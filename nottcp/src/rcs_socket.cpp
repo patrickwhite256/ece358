@@ -177,6 +177,7 @@ void RCSSocket::resend_ack() {
 int RCSSocket::flush_send_q() {
     int sent = 0;
 
+    uint8_t timeouts = 0;
     while(!send_q.empty()) {
         Message *msg = send_q.front();
 
@@ -206,23 +207,29 @@ int RCSSocket::flush_send_q() {
             recv_ack();
         } catch(RCSException &ex) {
             if(ex.err_code == RCS_ERROR_TIMEOUT) {
+                timeouts++;
 #ifdef DEBUG
                 cout << "timeout on ack; resending." << endl;
                 update_timeout(get_timeout()); // increase timeout
 #endif
-                continue;
+                if(!(timeouts == 5 && msg->is_fin())) {
+                    continue;
+                }
             } else if(ex.err_code == RCS_ERROR_CORRUPT) {
 #ifdef DEBUG
                 cout << "corrupt ack; resending." << endl;
 #endif
+                timeouts = 0;
                 continue;
             } else if(ex.err_code == RCS_ERROR_RESEND) {
 #ifdef DEBUG
                 cout << "in order data while waiting for ack; resending" << endl;
 #endif
+                timeouts = 0;
                 continue;
+            } else {
+                assert(false);
             }
-            assert(false);
         }
         ftime(&time_recv);
         uint32_t rtt = (time_recv.time - time_sent.time) * 1000 +
@@ -237,6 +244,7 @@ int RCSSocket::flush_send_q() {
 #endif
         send_q.pop_front();
         delete msg;
+        timeouts = 0;
     }
 
     return sent;
@@ -410,7 +418,7 @@ void RCSSocket::timed_ack_wait() {
     std::cout << "waiting for ack to be recieved" << std::endl;
     while (true) {
         try {
-            Message *resent_msg = get_msg(4 * get_timeout());
+            Message *resent_msg = get_msg(2 * get_timeout());
             std::cout << "packet was resenti. resending ack" << std::endl;
             resend_ack();
             delete resent_msg;
