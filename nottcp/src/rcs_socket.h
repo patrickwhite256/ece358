@@ -48,7 +48,7 @@ struct RCSSocket {
 
     RCSSocket() : state(RCS_STATE_NEW), data_buf_size(0) {}
     RCSSocket(int sockfd) : ucp_sockfd(sockfd), state(RCS_STATE_NEW), data_buf_size(0) {}
-    ~RCSSocket() { delete cxn_addr; }
+    ~RCSSocket() { delete cxn_addr; if(last_ack) delete last_ack; }
 
     int flush_send_q();
     Message *recv(bool no_ack = false);

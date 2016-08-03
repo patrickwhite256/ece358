@@ -25,6 +25,7 @@
 
 #include <cstdint>
 #include <cstdlib>
+#include <netinet/in.h>
 
 #include "rcs_exception.h"
 
@@ -51,6 +52,8 @@ struct Message {
     uint16_t size;
     uint8_t seq_n;
     uint8_t ack_n;
+
+    sockaddr_in *sender = NULL;
 
     Message(const char *msg_content, uint16_t content_size, uint8_t flags);
     ~Message();

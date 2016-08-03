@@ -80,10 +80,13 @@ int rcsAccept(int sockfd, struct sockaddr_in *addr) {
 
     while(true) {
         Message *syn_msg = listen_sock->recv();
-        memcpy(addr, listen_sock->cxn_addr, sizeof(sockaddr_in));
         if (syn_msg->is_syn()) {
+            memcpy(addr, listen_sock->cxn_addr, sizeof(sockaddr_in));
             delete syn_msg;
             break;
+        } else {
+            delete listen_sock->cxn_addr;
+            listen_sock->cxn_addr = NULL;
         }
         delete syn_msg;
     }
@@ -253,5 +256,7 @@ int rcsClose(int sockfd) {
     }
 
     std::cout << "closing socket" << std::endl;
-    return rcs_sock->close();
+    int ret_val = rcs_sock->close();
+    delete rcs_sock;
+    return ret_val;
 }

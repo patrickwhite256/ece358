@@ -106,6 +106,8 @@ int RCSSocket::close() {
 #ifdef DEBUG
         std::cout << "this is the last RCS sock bound to UCP sockfd " << ucp_sockfd << ". closing it" << std::endl;
 #endif
+        std::mutex *old_mutex = RCSSocket::get_ucp_mutex();
+        delete old_mutex;
         g_ucp_sock_mutexes.erase(ucp_sockfd);
         result = ucpClose(ucp_sockfd);
     }
@@ -150,6 +152,7 @@ void RCSSocket::send_ack() {
 #endif
         b_sent = safe_ucp_send(ack_buf, ack->size);
     }
+    delete[] ack_buf;
 
     if(last_ack != NULL) delete last_ack;
     last_ack = ack;
@@ -168,6 +171,7 @@ void RCSSocket::resend_ack() {
 #endif
         b_sent = safe_ucp_send(ack_buf, last_ack->size);
     }
+    delete[] ack_buf;
 }
 
 int RCSSocket::flush_send_q() {
@@ -187,6 +191,7 @@ int RCSSocket::flush_send_q() {
 #endif
 
         int b_sent = safe_ucp_send(msg_buf, msg->size);
+        delete[] msg_buf;
         if(b_sent != msg->size) {
             // incomplete packet sent; retry
 #ifdef DEBUG
@@ -249,6 +254,7 @@ Message *RCSSocket::get_msg(uint32_t timeout) {
             int b_recv = safe_ucp_recv(msg_buf, MAX_UCP_PACKET_SIZE, recv_addr);
 
             if(b_recv < 0 && (errno == EWOULDBLOCK || errno == EAGAIN)){
+                delete recv_addr;
                 // no more data
                 break;
             }
@@ -269,19 +275,30 @@ Message *RCSSocket::get_msg(uint32_t timeout) {
             RCSSocket *recipient = RCSSocket::get_by_addr(*recv_addr);
             if(recipient == NULL and state == RCS_STATE_LISTENING) {
                 recipient = this;
-                cxn_addr = recv_addr;
+                msg->sender = recv_addr;
+                cout << "(0==" << id << ") msg->sender->sin_port: " << ntohs(msg->sender->sin_port) << " cs: " << msg->checksum << endl;
             } else if(recipient == NULL) {
                 recipient = parent_sock;
-                delete recv_addr;
+                msg->sender = recv_addr;
+                cout << "(1==" << id << ") msg->sender->sin_port: " << ntohs(msg->sender->sin_port) << " cs: " << msg->checksum  << endl;
             } else {
                 delete recv_addr;
             }
+            cout << "this message is being sent to socket#" << recipient->id << endl;
 
             recipient->safe_message_push(msg);
         }
 
         if(!safe_messages_empty()) {
             Message *msg = safe_message_front();
+            if(state == RCS_STATE_LISTENING) {
+                cout << "here" << endl;
+                cxn_addr = msg->sender;
+                cout << "msg->sender->sin_port: " << ntohs(msg->sender->sin_port) << " cs: " << msg->checksum  << endl;
+                cout << "cxn_addr->sin_port: " << ntohs(cxn_addr->sin_port) << " cs: " << msg->checksum  << endl;
+                msg->sender = NULL;
+            }
+
             safe_message_pop();
 #ifdef VERBOSE
             print_msg_data(msg, false);

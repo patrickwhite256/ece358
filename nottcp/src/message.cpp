@@ -38,13 +38,18 @@ Message::Message(const char *msg_content, uint16_t content_size, uint8_t msg_fla
     }
     flags = msg_flags;
     size = HEADER_SIZE + content_size;
-    header = NULL;
+
+    checksum = 0;
+    seq_n = 0;
+    ack_n = 0;
     random = rand();
+    header = NULL;
 }
 
 Message::~Message() {
     delete[] content;
     if(header) delete[] header;
+    if(sender) delete sender;
 }
 
 uint16_t Message::get_content_size() {
